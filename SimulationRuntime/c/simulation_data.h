@@ -335,6 +335,7 @@ typedef struct LINEAR_SYSTEM_DATA
 
   void (*residualFunc)(void*, const double*, double*, const int*);
   void (*initializeStaticLSData)(void*, void*);
+  int (*strictTearingFunctionCall)(struct DATA*);
 
 
   /* attributes of iteration variables */

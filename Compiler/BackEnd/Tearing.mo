@@ -1711,14 +1711,22 @@ protected
   Option<BackendDAE.TearingSet> casualTearingSet;
   list<BackendDAE.Equation> eqn_lst;
   list<BackendDAE.Var> var_lst;
-  Boolean linear,simulation,b,noDynamicStateSelection;
+  Boolean linear,simulation,b,noDynamicStateSelection,dynamicTearing;
 algorithm
 
+  linear := getLinearfromJacType(jacType);
   BackendDAE.EQSYSTEM(stateSets = stateSets) := isyst;
   noDynamicStateSelection := listEmpty(stateSets);
-
   BackendDAE.SHARED(backendDAEType=DAEtype) := ishared;
   simulation := stringEq(BackendDump.printBackendDAEType2String(DAEtype), "simulation");
+
+  // check if dynamic tearing is enabled for linear/nonlinear system
+  dynamicTearing := match (Config.dynamicTearing(),linear,noDynamicStateSelection,simulation)
+    case ("true",_,true,true) then true;
+    case ("linear",true,true,true) then true;
+    case ("nonlinear",false,true,true) then true;
+    else then false;
+  end match;
 
   if Flags.isSet(Flags.TEARING_DUMPVERBOSE) then
     print("\n" + BORDER + "\nBEGINNING of CellierTearing\n\n");
@@ -1832,7 +1840,7 @@ algorithm
   // Determine casual tearing set if dynamic tearing is enabled
   // *****************************************************************
 
-  if simulation and noDynamicStateSelection and Config.dynamicTearing() then
+  if dynamicTearing then
 
     if Flags.isSet(Flags.TEARING_DUMP) or Flags.isSet(Flags.TEARING_DUMPVERBOSE) then
       print("\n\nDetermine CASUAL TEARING SET\n" + BORDER + BORDER + "\n\n");
@@ -1947,7 +1955,6 @@ algorithm
   // Determine the rest of the information needed for BackendDAE.TORNSYSTEM
   // ***************************************************************************
 
-  linear := getLinearfromJacType(jacType);
   ocomp := BackendDAE.TORNSYSTEM(strictTearingSet,casualTearingSet,linear,mixedSystem);
   outRunMatching := true;
   if Flags.isSet(Flags.TEARING_DUMPVERBOSE) then
