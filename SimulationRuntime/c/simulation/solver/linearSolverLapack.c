@@ -251,6 +251,19 @@ int solveLapack(DATA *data, int sysNumber)
     }
   }
 
+  // Workaround ---->
+  // solverData->x = _omc_addVectorVector(solverData->x, solverData->work, solverData->b);
+  // wrapper_fvec_lapack(solverData->x, solverData->work, &iflag, data, sysNumber);
+  // residualNorm = _omc_euclideanVectorNorm(solverData->work);
+
+  // if (isnan(residualNorm)){
+    // warningStreamPrint(LOG_LS, 0,
+        // "Failed to solve linear system of equations (no. %d) at time %f, because of division by zero.",
+        // (int)systemData->equationIndex, data->localData[0]->timeValue);
+    // success = 0;
+  // }
+  // <-------
+
   if (1 == success){
 
     if (1 == systemData->method){
@@ -260,6 +273,12 @@ int solveLapack(DATA *data, int sysNumber)
       /* update inner equations */
       wrapper_fvec_lapack(solverData->x, solverData->work, &iflag, data, sysNumber);
       residualNorm = _omc_euclideanVectorNorm(solverData->work);
+      if (isnan(residualNorm)){
+        warningStreamPrint(LOG_LS, 0,
+            "Failed to solve linear system of equations (no. %d) at time %f, because of division by zero.",
+            (int)systemData->equationIndex, data->localData[0]->timeValue);
+        success = 0;
+      }
     } else {
       /* take the solution */
       _omc_copyVector(solverData->x, solverData->b);
