@@ -1700,6 +1700,7 @@ int solveHomotopy(DATA *data, threadData_t *threadData, int sysNumber)
   int runHomotopy = 0;
   int skipNewton = 0;
   int numberOfFunctionEvaluationsOld = solverData->numberOfFunctionEvaluations;
+  int casualTearingSet = systemData->strictTearingFunctionCall != NULL;
 
   modelica_boolean* relationsPreBackup;
   relationsPreBackup = (modelica_boolean*) malloc(data->modelData.nRelations*sizeof(modelica_boolean));
@@ -1837,12 +1838,27 @@ int solveHomotopy(DATA *data, threadData_t *threadData, int sysNumber)
     if (!skipNewton){
 
       /* set x vector */
-      if(data->simulationInfo.discreteCall)
+      if(data->simulationInfo.discreteCall){
+        // hier
+        debugVectorDouble(LOG_DT,"nlsx-Vector davor", systemData->nlsx, solverData->n);
         memcpy(systemData->nlsx, solverData->x, solverData->n*(sizeof(double)));
-      else
+        // hier
+        debugVectorDouble(LOG_DT,"nlsx-Vector danach", systemData->nlsx, solverData->n);
+      }
+      else{
         memcpy(systemData->nlsxExtrapolation, solverData->x, solverData->n*(sizeof(double)));
+        // hier
+        debugVectorDouble(LOG_DT,"nlsxExtrapolation-Vector", systemData->nlsxExtrapolation, solverData->n);
+      }
 
       newtonAlgorithm(solverData, solverData->x);
+
+      // If this is the casual tearing set (only exists for dynamic tearing), break after first try
+      if (solverData->info == -1 && casualTearingSet){
+        infoStreamPrint(LOG_NLS, 0, "### No Solution for the casual tearing set at the first try! ###");
+        break;
+      }
+
       if (solverData->info == -1){
         solverDataHybrid = (DATA_HYBRD*)(solverData->dataHybrid);
         systemData->solverData = solverDataHybrid;

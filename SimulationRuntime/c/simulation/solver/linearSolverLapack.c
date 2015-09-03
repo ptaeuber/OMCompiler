@@ -261,6 +261,12 @@ int solveLapack(DATA *data, threadData_t *threadData, int sysNumber)
       /* update inner equations */
       wrapper_fvec_lapack(solverData->x, solverData->work, &iflag, dataAndThreadData, sysNumber);
       residualNorm = _omc_euclideanVectorNorm(solverData->work);
+      if (isnan(residualNorm)){
+        warningStreamPrint(LOG_LS, 0,
+            "Failed to solve linear system of equations (no. %d) at time %f, because of division by zero.",
+            (int)systemData->equationIndex, data->localData[0]->timeValue);
+        success = 0;
+      }
     } else {
       /* take the solution */
       _omc_copyVector(solverData->x, solverData->b);

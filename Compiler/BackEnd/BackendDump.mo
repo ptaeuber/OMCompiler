@@ -1031,6 +1031,7 @@ algorithm
         dumpEqnsSolved2(rest,eqns,vars);
       then
         ();
+    // no dynamic tearing
     case (BackendDAE.TORNSYSTEM(BackendDAE.TEARINGSET(tearingvars=vlst,residualequations=elst,otherEqnVarTpl=eqnsvartpllst),NONE(),linear=b)::rest,_,_)
       equation
         s = if b then "linear" else "nonlinear";
@@ -1051,6 +1052,7 @@ algorithm
         dumpEqnsSolved2(rest,eqns,vars);
       then
         ();
+    // dynamic tearing
     case (BackendDAE.TORNSYSTEM(BackendDAE.TEARINGSET(tearingvars=vlst,residualequations=elst,otherEqnVarTpl=eqnsvartpllst),SOME(BackendDAE.TEARINGSET(tearingvars=vlst2,residualequations=elst2,otherEqnVarTpl=eqnsvartpllst2)),linear=b)::rest,_,_)
       equation
         s = if b then "linear" else "nonlinear";
@@ -3222,9 +3224,9 @@ protected type DumpCompShortTornTpl = tuple<list<tuple<Integer,Integer>>,list<tu
 public function dumpCompShort
   input BackendDAE.BackendDAE inDAE;
 protected
-  Integer sys,inp,st,dvar,dst,seq,salg,sarr,sce,swe,sie,eqsys,meqsys,teqsys,strcomps;
+  Integer sys,inp,st,dvar,dst,seq,salg,sarr,sce,swe,sie,eqsys,meqsys,teqsys,teqsys2,strcomps;
   list<Integer> e_jc,e_jn,e_nj;
-  list<tuple<Integer,Integer>> te_l,te_nl;
+  list<tuple<Integer,Integer>> te_l,te_nl,te_l2,te_nl2;
   list<Integer> m_se,m_salg,m_sarr,m_sec;
   list<tuple<Integer,Integer>> me_jc,e_jt,me_jt,me_jn,me_nj,me_lt,me_nt;
   list<DAE.ComponentRef> states,discvars,discstates;
@@ -3236,7 +3238,7 @@ protected
   list<String> msgs;
   DumpCompShortSystemsTpl systemsTpl;
   DumpCompShortMixedTpl mixedTpl;
-  DumpCompShortTornTpl tornTpl;
+  DumpCompShortTornTpl tornTpl,tornTpl2;
   BackendDAE.BackendDAEType backendDAEType;
 algorithm
   BackendDAE.DAE(systs, BackendDAE.SHARED(backendDAEType=backendDAEType)) := inDAE;
@@ -3249,13 +3251,16 @@ algorithm
   discstates := BaseHashSet.hashSetList(HS);
   dst := listLength(discstates);
 
-  ((sys,inp,st,states,dvar,discvars,seq,salg,sarr,sce,swe,sie,systemsTpl,mixedTpl,tornTpl)) := BackendDAEUtil.foldEqSystem(inDAE,dumpCompShort1,(0,0,0,{},0,{},0,0,0,0,0,0,({},{},{},{}),({},{},{},{},{},{},{},{},{},{}),({},{})));
+  ((sys,inp,st,states,dvar,discvars,seq,salg,sarr,sce,swe,sie,systemsTpl,mixedTpl,tornTpl,tornTpl2)) := BackendDAEUtil.foldEqSystem(inDAE,dumpCompShort1,(0,0,0,{},0,{},0,0,0,0,0,0,({},{},{},{}),({},{},{},{},{},{},{},{},{},{}),({},{}),({},{})));
   (e_jc,e_jt,e_jn,e_nj) := systemsTpl;
   (m_se,m_salg,m_sarr,m_sec,me_jc,me_jt,me_jn,me_nj,me_lt,me_nt) := mixedTpl;
   (te_l,te_nl) := tornTpl;
+  (te_l2,te_nl2) := tornTpl2;
+
   eqsys := listLength(e_jc)+listLength(e_jt)+listLength(e_jn)+listLength(e_nj);
   meqsys := listLength(m_se)+listLength(m_sarr)+listLength(m_salg)+listLength(m_sec)+listLength(me_jc)+listLength(me_jt)+listLength(me_jn)+listLength(me_nj)+listLength(me_lt)+listLength(me_nt);
   teqsys := listLength(te_l)+listLength(te_nl);
+  teqsys2 := listLength(te_l2)+listLength(te_nl2);
   strcomps := seq+eqsys+meqsys+sarr+salg+sce+swe+sie+teqsys;
 
   sysStr := intString(sys);
@@ -3299,7 +3304,10 @@ algorithm
     dumpCompMixed(mixedTpl);
   end if;
   if intGt(teqsys,0) then
-    dumpCompTorn(tornTpl);
+    dumpCompTorn(tornTpl,"strict");
+  end if;
+  if intGt(teqsys2,0) then
+    dumpCompTorn(tornTpl2,"casual");
   end if;
 end dumpCompShort;
 
@@ -3320,6 +3328,7 @@ end dumpCompSystems;
 
 protected function dumpCompTorn
   input DumpCompShortTornTpl systemsTpl;
+  input String whichset;
 protected
   list<tuple<Integer,Integer>> te_l,te_nl;
   String s_l,s_nl;
@@ -3327,7 +3336,7 @@ algorithm
   (te_l,te_nl) := systemsTpl;
   s_l := equationSizesStr(te_l,intTplString);
   s_nl := equationSizesStr(te_nl,intTplString);
-  Error.addMessage(Error.BACKENDDAEINFO_TORN, {s_l,s_nl});
+  Error.addMessage(Error.BACKENDDAEINFO_TORN, {whichset,s_l,s_nl});
 end dumpCompTorn;
 
 protected function dumpCompMixed
@@ -3393,7 +3402,7 @@ end intTplString;
 protected function dumpCompShort1
   input BackendDAE.EqSystem inSyst;
   input BackendDAE.Shared inShared;
-  input tuple<Integer,Integer,Integer,list<DAE.ComponentRef>,Integer,list<DAE.ComponentRef>,Integer,Integer,Integer,Integer,Integer,Integer,tuple<list<Integer>,list<tuple<Integer,Integer>>,list<Integer>,list<Integer>>,tuple<list<Integer>,list<Integer>,list<Integer>,list<Integer>,list<tuple<Integer,Integer>>,list<tuple<Integer,Integer>>,list<tuple<Integer,Integer>>,list<tuple<Integer,Integer>>,list<tuple<Integer,Integer>>,list<tuple<Integer,Integer>>>,tuple<list<tuple<Integer,Integer>>,list<tuple<Integer,Integer>>>> inTpl;
+  input tuple<Integer,Integer,Integer,list<DAE.ComponentRef>,Integer,list<DAE.ComponentRef>,Integer,Integer,Integer,Integer,Integer,Integer,tuple<list<Integer>,list<tuple<Integer,Integer>>,list<Integer>,list<Integer>>,tuple<list<Integer>,list<Integer>,list<Integer>,list<Integer>,list<tuple<Integer,Integer>>,list<tuple<Integer,Integer>>,list<tuple<Integer,Integer>>,list<tuple<Integer,Integer>>,list<tuple<Integer,Integer>>,list<tuple<Integer,Integer>>>,tuple<list<tuple<Integer,Integer>>,list<tuple<Integer,Integer>>>,tuple<list<tuple<Integer,Integer>>,list<tuple<Integer,Integer>>>> inTpl;
   output tuple<
        Integer,
        Integer,
@@ -3409,6 +3418,7 @@ protected function dumpCompShort1
        Integer,
        DumpCompShortSystemsTpl,
        DumpCompShortMixedTpl,
+       DumpCompShortTornTpl,
        DumpCompShortTornTpl> outTpl;
 protected
   BackendDAE.Variables vars;
@@ -3416,17 +3426,17 @@ protected
   Integer sys,inp,st,dvar,seq,salg,sarr,sce,swe,sie,inp1,st1,dvar1,seq1,salg1,sarr1,sce1,swe1,sie1;
   tuple<list<Integer>,list<tuple<Integer,Integer>>,list<Integer>,list<Integer>> eqsys,eqsys1;
   tuple<list<Integer>,list<Integer>,list<Integer>,list<Integer>,list<tuple<Integer,Integer>>,list<tuple<Integer,Integer>>,list<tuple<Integer,Integer>>,list<tuple<Integer,Integer>>,list<tuple<Integer,Integer>>,list<tuple<Integer,Integer>>> meqsys,meqsys1;
-  tuple<list<tuple<Integer,Integer>>,list<tuple<Integer,Integer>>> teqsys,teqsys1;
+  tuple<list<tuple<Integer,Integer>>,list<tuple<Integer,Integer>>> teqsys,teqsys1,teqsys_2,teqsys1_2;
   list<DAE.ComponentRef> states,states1,discvars,discvars1;
 algorithm
   BackendDAE.EQSYSTEM(orderedVars=vars) := inSyst;
-  (sys, inp, st, states, dvar, discvars, seq, salg, sarr, sce, swe, sie, eqsys, meqsys, teqsys) := inTpl;
+  (sys, inp, st, states, dvar, discvars, seq, salg, sarr, sce, swe, sie, eqsys, meqsys, teqsys, teqsys_2) := inTpl;
 
   ((inp1,st1,states1,dvar1,discvars1)) := BackendVariable.traverseBackendDAEVars(vars,traversingisStateTopInputVarFinder,(inp,st,states,dvar,discvars));
   comps := BackendDAEUtil.getStrongComponents(inSyst);
-  ((seq1,salg1,sarr1,sce1,swe1,sie1,eqsys1,meqsys1,teqsys1)) := List.fold(comps,dumpCompShort2,(seq,salg,sarr,sce,swe,sie,eqsys,meqsys,teqsys));
+  ((seq1,salg1,sarr1,sce1,swe1,sie1,eqsys1,meqsys1,teqsys1,teqsys1_2)) := List.fold(comps,dumpCompShort2,(seq,salg,sarr,sce,swe,sie,eqsys,meqsys,teqsys,teqsys_2));
 
-  outTpl := ((sys+1, inp1, st1, states1, dvar1, discvars1, seq1, salg1, sarr1, sce1, swe1, sie1, eqsys1, meqsys1, teqsys1));
+  outTpl := ((sys+1, inp1, st1, states1, dvar1, discvars1, seq1, salg1, sarr1, sce1, swe1, sie1, eqsys1, meqsys1, teqsys1, teqsys1_2));
 end dumpCompShort1;
 
 protected function traversingisStateTopInputVarFinder
@@ -3462,71 +3472,87 @@ end traversingisStateTopInputVarFinder;
 
 protected function dumpCompShort2
   input BackendDAE.StrongComponent inComp;
-  input tuple<Integer,Integer,Integer,Integer,Integer,Integer,tuple<list<Integer>,list<tuple<Integer,Integer>>,list<Integer>,list<Integer>>,tuple<list<Integer>,list<Integer>,list<Integer>,list<Integer>,list<tuple<Integer,Integer>>,list<tuple<Integer,Integer>>,list<tuple<Integer,Integer>>,list<tuple<Integer,Integer>>,list<tuple<Integer,Integer>>,list<tuple<Integer,Integer>>>,tuple<list<tuple<Integer,Integer>>,list<tuple<Integer,Integer>>>> inTpl;
-  output tuple<Integer,Integer,Integer,Integer,Integer,Integer,tuple<list<Integer>,list<tuple<Integer,Integer>>,list<Integer>,list<Integer>>,tuple<list<Integer>,list<Integer>,list<Integer>,list<Integer>,list<tuple<Integer,Integer>>,list<tuple<Integer,Integer>>,list<tuple<Integer,Integer>>,list<tuple<Integer,Integer>>,list<tuple<Integer,Integer>>,list<tuple<Integer,Integer>>>,tuple<list<tuple<Integer,Integer>>,list<tuple<Integer,Integer>>>> outTpl;
+  input tuple<Integer,Integer,Integer,Integer,Integer,Integer,tuple<list<Integer>,list<tuple<Integer,Integer>>,list<Integer>,list<Integer>>,tuple<list<Integer>,list<Integer>,list<Integer>,list<Integer>,list<tuple<Integer,Integer>>,list<tuple<Integer,Integer>>,list<tuple<Integer,Integer>>,list<tuple<Integer,Integer>>,list<tuple<Integer,Integer>>,list<tuple<Integer,Integer>>>,tuple<list<tuple<Integer,Integer>>,list<tuple<Integer,Integer>>>,tuple<list<tuple<Integer,Integer>>,list<tuple<Integer,Integer>>>> inTpl;
+  output tuple<Integer,Integer,Integer,Integer,Integer,Integer,tuple<list<Integer>,list<tuple<Integer,Integer>>,list<Integer>,list<Integer>>,tuple<list<Integer>,list<Integer>,list<Integer>,list<Integer>,list<tuple<Integer,Integer>>,list<tuple<Integer,Integer>>,list<tuple<Integer,Integer>>,list<tuple<Integer,Integer>>,list<tuple<Integer,Integer>>,list<tuple<Integer,Integer>>>,tuple<list<tuple<Integer,Integer>>,list<tuple<Integer,Integer>>>,tuple<list<tuple<Integer,Integer>>,list<tuple<Integer,Integer>>>> outTpl;
 algorithm
   outTpl := match (inComp,inTpl)
     local
-      Integer e,d,nnz;
-      list<Integer> ilst,ilst1;
+      Integer e,d,e2,d2,nnz;
+      list<Integer> ilst,ilst1,ilst2;
       Integer seq,salg,sarr,sce,swe,sie;
       list<Integer> e_jc,e_jn,e_nj,m_se,m_salg,m_sarr,m_sec;
-      list<tuple<Integer,Integer>> e_jt,me_jc,me_jt,me_jn,me_nj,me_lt,me_nt,te_l,te_nl;
+      list<tuple<Integer,Integer>> e_jt,me_jc,me_jt,me_jn,me_nj,me_lt,me_nt,te_l,te_nl,te_l2,te_nl2;
       tuple<list<Integer>,list<tuple<Integer,Integer>>,list<Integer>,list<Integer>> eqsys;
       list<tuple<Integer, Integer, BackendDAE.Equation>> jac;
       tuple<list<Integer>,list<Integer>,list<Integer>,list<Integer>,list<tuple<Integer,Integer>>,list<tuple<Integer,Integer>>,list<tuple<Integer,Integer>>,list<tuple<Integer,Integer>>,list<tuple<Integer,Integer>>,list<tuple<Integer,Integer>>> meqsys;
-      tuple<list<tuple<Integer,Integer>>,list<tuple<Integer,Integer>>> teqsys;
-      list<tuple<Integer,list<Integer>>> eqnvartpllst;
+      tuple<list<tuple<Integer,Integer>>,list<tuple<Integer,Integer>>> teqsys,teqsys2;
+      list<tuple<Integer,list<Integer>>> eqnvartpllst,eqnvartpllst2;
 
-    case (BackendDAE.SINGLEEQUATION(),(seq,salg,sarr,sce,swe,sie,eqsys,meqsys,teqsys))
-    then ((seq+1,salg,sarr,sce,swe,sie,eqsys,meqsys,teqsys));
+    case (BackendDAE.SINGLEEQUATION(),(seq,salg,sarr,sce,swe,sie,eqsys,meqsys,teqsys,teqsys2))
+    then ((seq+1,salg,sarr,sce,swe,sie,eqsys,meqsys,teqsys,teqsys2));
 
-    case (BackendDAE.SINGLEARRAY(),(seq,salg,sarr,sce,swe,sie,eqsys,meqsys,teqsys))
-    then ((seq,salg,sarr+1,sce,swe,sie,eqsys,meqsys,teqsys));
+    case (BackendDAE.SINGLEARRAY(),(seq,salg,sarr,sce,swe,sie,eqsys,meqsys,teqsys,teqsys2))
+    then ((seq,salg,sarr+1,sce,swe,sie,eqsys,meqsys,teqsys,teqsys2));
 
-    case (BackendDAE.SINGLEIFEQUATION(),(seq,salg,sarr,sce,swe,sie,eqsys,meqsys,teqsys))
-    then ((seq,salg,sarr,sce,swe,sie+1,eqsys,meqsys,teqsys));
+    case (BackendDAE.SINGLEIFEQUATION(),(seq,salg,sarr,sce,swe,sie,eqsys,meqsys,teqsys,teqsys2))
+    then ((seq,salg,sarr,sce,swe,sie+1,eqsys,meqsys,teqsys,teqsys2));
 
-    case (BackendDAE.SINGLEALGORITHM(),(seq,salg,sarr,sce,swe,sie,eqsys,meqsys,teqsys))
-    then ((seq,salg+1,sarr,sce,swe,sie,eqsys,meqsys,teqsys));
+    case (BackendDAE.SINGLEALGORITHM(),(seq,salg,sarr,sce,swe,sie,eqsys,meqsys,teqsys,teqsys2))
+    then ((seq,salg+1,sarr,sce,swe,sie,eqsys,meqsys,teqsys,teqsys2));
 
-    case (BackendDAE.SINGLECOMPLEXEQUATION(),(seq,salg,sarr,sce,swe,sie,eqsys,meqsys,teqsys))
-    then((seq,salg,sarr,sce+1,swe,sie,eqsys,meqsys,teqsys));
+    case (BackendDAE.SINGLECOMPLEXEQUATION(),(seq,salg,sarr,sce,swe,sie,eqsys,meqsys,teqsys,teqsys2))
+    then((seq,salg,sarr,sce+1,swe,sie,eqsys,meqsys,teqsys,teqsys2));
 
-    case (BackendDAE.SINGLEWHENEQUATION(),(seq,salg,sarr,sce,swe,sie,eqsys,meqsys,teqsys))
-    then ((seq,salg,sarr,sce,swe+1,sie,eqsys,meqsys,teqsys));
+    case (BackendDAE.SINGLEWHENEQUATION(),(seq,salg,sarr,sce,swe,sie,eqsys,meqsys,teqsys,teqsys2))
+    then ((seq,salg,sarr,sce,swe+1,sie,eqsys,meqsys,teqsys,teqsys2));
 
-    case (BackendDAE.EQUATIONSYSTEM(eqns=ilst,jacType=BackendDAE.JAC_CONSTANT()),(seq,salg,sarr,sce,swe,sie,(e_jc,e_jt,e_jn,e_nj),meqsys,teqsys)) equation
+    case (BackendDAE.EQUATIONSYSTEM(eqns=ilst,jacType=BackendDAE.JAC_CONSTANT()),(seq,salg,sarr,sce,swe,sie,(e_jc,e_jt,e_jn,e_nj),meqsys,teqsys,teqsys2)) equation
         e = listLength(ilst);
-    then ((seq,salg,sarr,sce,swe,sie,(e::e_jc,e_jt,e_jn,e_nj),meqsys,teqsys));
+    then ((seq,salg,sarr,sce,swe,sie,(e::e_jc,e_jt,e_jn,e_nj),meqsys,teqsys,teqsys2));
 
-    case (BackendDAE.EQUATIONSYSTEM(eqns=ilst,jac=BackendDAE.FULL_JACOBIAN(SOME(jac)),jacType=BackendDAE.JAC_LINEAR()),(seq,salg,sarr,sce,swe,sie,(e_jc,e_jt,e_jn,e_nj),meqsys,teqsys))
+    case (BackendDAE.EQUATIONSYSTEM(eqns=ilst,jac=BackendDAE.FULL_JACOBIAN(SOME(jac)),jacType=BackendDAE.JAC_LINEAR()),(seq,salg,sarr,sce,swe,sie,(e_jc,e_jt,e_jn,e_nj),meqsys,teqsys,teqsys2))
       equation
         e = listLength(ilst);
         nnz = listLength(jac);
-      then ((seq,salg,sarr,sce,swe,sie,(e_jc,(e,nnz)::e_jt,e_jn,e_nj),meqsys,teqsys));
+      then ((seq,salg,sarr,sce,swe,sie,(e_jc,(e,nnz)::e_jt,e_jn,e_nj),meqsys,teqsys,teqsys2));
 
-    case (BackendDAE.EQUATIONSYSTEM(eqns=ilst,jacType=BackendDAE.JAC_NONLINEAR()),(seq,salg,sarr,sce,swe,sie,(e_jc,e_jt,e_jn,e_nj),meqsys,teqsys)) equation
+    case (BackendDAE.EQUATIONSYSTEM(eqns=ilst,jacType=BackendDAE.JAC_NONLINEAR()),(seq,salg,sarr,sce,swe,sie,(e_jc,e_jt,e_jn,e_nj),meqsys,teqsys,teqsys2)) equation
       e = listLength(ilst);
-    then ((seq,salg,sarr,sce,swe,sie,(e_jc,e_jt,e::e_jn,e_nj),meqsys,teqsys));
+    then ((seq,salg,sarr,sce,swe,sie,(e_jc,e_jt,e::e_jn,e_nj),meqsys,teqsys,teqsys2));
 
-    case (BackendDAE.EQUATIONSYSTEM(eqns=ilst,jacType=BackendDAE.JAC_GENERIC()),(seq,salg,sarr,sce,swe,sie,(e_jc,e_jt,e_jn,e_nj),meqsys,teqsys)) equation
+    case (BackendDAE.EQUATIONSYSTEM(eqns=ilst,jacType=BackendDAE.JAC_GENERIC()),(seq,salg,sarr,sce,swe,sie,(e_jc,e_jt,e_jn,e_nj),meqsys,teqsys,teqsys2)) equation
       e = listLength(ilst);
-    then ((seq,salg,sarr,sce,swe,sie,(e_jc,e_jt,e::e_jn,e_nj),meqsys,teqsys));
+    then ((seq,salg,sarr,sce,swe,sie,(e_jc,e_jt,e::e_jn,e_nj),meqsys,teqsys,teqsys2));
 
-    case (BackendDAE.EQUATIONSYSTEM(eqns=ilst,jacType=BackendDAE.JAC_NO_ANALYTIC()),(seq,salg,sarr,sce,swe,sie,(e_jc,e_jt,e_jn,e_nj),meqsys,teqsys)) equation
+    case (BackendDAE.EQUATIONSYSTEM(eqns=ilst,jacType=BackendDAE.JAC_NO_ANALYTIC()),(seq,salg,sarr,sce,swe,sie,(e_jc,e_jt,e_jn,e_nj),meqsys,teqsys,teqsys2)) equation
       e = listLength(ilst);
-    then ((seq,salg,sarr,sce,swe,sie,(e_jc,e_jt,e_jn,e::e_nj),meqsys,teqsys));
+    then ((seq,salg,sarr,sce,swe,sie,(e_jc,e_jt,e_jn,e::e_nj),meqsys,teqsys,teqsys2));
 
-    case (BackendDAE.TORNSYSTEM(BackendDAE.TEARINGSET(tearingvars=ilst,otherEqnVarTpl=eqnvartpllst),linear=true),(seq,salg,sarr,sce,swe,sie,eqsys,meqsys,(te_l,te_nl))) equation
+    // no dynamic tearing
+    case (BackendDAE.TORNSYSTEM(BackendDAE.TEARINGSET(tearingvars=ilst,otherEqnVarTpl=eqnvartpllst),NONE(),linear=true),(seq,salg,sarr,sce,swe,sie,eqsys,meqsys,(te_l,te_nl),(te_l2,te_nl2))) equation
       d = listLength(ilst);
       e = listLength(eqnvartpllst);
-    then ((seq,salg,sarr,sce,swe,sie,eqsys,meqsys,((d,e)::te_l,te_nl)));
+    then ((seq,salg,sarr,sce,swe,sie,eqsys,meqsys,((d,e)::te_l,te_nl),((0,0)::te_l2,te_nl2)));
 
-    case (BackendDAE.TORNSYSTEM(BackendDAE.TEARINGSET(tearingvars=ilst,otherEqnVarTpl=eqnvartpllst),linear=false),(seq,salg,sarr,sce,swe,sie,eqsys,meqsys,(te_l,te_nl))) equation
+    case (BackendDAE.TORNSYSTEM(BackendDAE.TEARINGSET(tearingvars=ilst,otherEqnVarTpl=eqnvartpllst),NONE(),linear=false),(seq,salg,sarr,sce,swe,sie,eqsys,meqsys,(te_l,te_nl),(te_l2,te_nl2))) equation
       d = listLength(ilst);
       e = listLength(eqnvartpllst);
-    then ((seq,salg,sarr,sce,swe,sie,eqsys,meqsys,(te_l,(d,e)::te_nl)));
+    then ((seq,salg,sarr,sce,swe,sie,eqsys,meqsys,(te_l,(d,e)::te_nl),(te_l2,(0,0)::te_nl2)));
+
+    // dynamic tearing
+    case (BackendDAE.TORNSYSTEM(BackendDAE.TEARINGSET(tearingvars=ilst,otherEqnVarTpl=eqnvartpllst),SOME(BackendDAE.TEARINGSET(tearingvars=ilst2,otherEqnVarTpl=eqnvartpllst2)),linear=true),(seq,salg,sarr,sce,swe,sie,eqsys,meqsys,(te_l,te_nl),(te_l2,te_nl2))) equation
+      d = listLength(ilst);
+      e = listLength(eqnvartpllst);
+      d2 = listLength(ilst2);
+      e2 = listLength(eqnvartpllst2);
+    then ((seq,salg,sarr,sce,swe,sie,eqsys,meqsys,((d,e)::te_l,te_nl),((d2,e2)::te_l2,te_nl2)));
+
+    case (BackendDAE.TORNSYSTEM(BackendDAE.TEARINGSET(tearingvars=ilst,otherEqnVarTpl=eqnvartpllst),SOME(BackendDAE.TEARINGSET(tearingvars=ilst2,otherEqnVarTpl=eqnvartpllst2)),linear=false),(seq,salg,sarr,sce,swe,sie,eqsys,meqsys,(te_l,te_nl),(te_l2,te_nl2))) equation
+      d = listLength(ilst);
+      e = listLength(eqnvartpllst);
+      d2 = listLength(ilst2);
+      e2 = listLength(eqnvartpllst2);
+    then ((seq,salg,sarr,sce,swe,sie,eqsys,meqsys,(te_l,(d,e)::te_nl),(te_l2,(d2,e2)::te_nl2)));
 
     else equation
       print("dumpCompShort2 failed with:\n");

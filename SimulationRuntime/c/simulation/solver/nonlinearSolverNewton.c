@@ -203,7 +203,7 @@ int solveNewton(DATA *data, threadData_t *threadData, int sysNumber)
   int retries2 = 0;
   int nonContinuousCase = 0;
   modelica_boolean *relationsPreBackup = NULL;
-  int casualTearingSet = data->simulationInfo.nonlinearSystemData[sysNumber].strictTearingFunctionCall != NULL;
+  int casualTearingSet = systemData->strictTearingFunctionCall != NULL;
 
   DATA_USER* userdata = (DATA_USER*)malloc(sizeof(DATA_USER));
   assert(userdata != NULL);
@@ -291,6 +291,7 @@ int solveNewton(DATA *data, threadData_t *threadData, int sysNumber)
 
       /* Then try with old values (instead of extrapolating )*/
     }
+    // If this is the casual tearing set (only exists for dynamic tearing), break after first try
     else if(retries < 1 && casualTearingSet)
     {
       giveUp = 1;
