@@ -1941,7 +1941,7 @@ algorithm
 
   else
     if Flags.isSet(Flags.TEARING_DUMP) or Flags.isSet(Flags.TEARING_DUMPVERBOSE) then
-          print("Note:\n=====\nNo dynamic Tearing for this strong component. Check if\n- flag 'dynamicTearing' is set\n- strong component contains statesets\n- system belongs to simulation\n\n");
+          print("Note:\n=====\nNo dynamic Tearing for this strong component. Check if\n- flag 'dynamicTearing' is set proper\n- strong component does not contain statesets\n- system belongs to simulation\n\n");
     end if;
     if not b and not Flags.getConfigBool(Flags.FORCE_TEARING) then
         if Flags.isSet(Flags.TEARING_DUMP) or Flags.isSet(Flags.TEARING_DUMPVERBOSE) then

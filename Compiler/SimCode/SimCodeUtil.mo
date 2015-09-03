@@ -329,6 +329,19 @@ algorithm
     // update index of zero-Crossings after equations are created
     zeroCrossings := updateZeroCrossEqnIndex(zeroCrossings, eqBackendSimCodeMapping, BackendDAEUtil.daeSize(dlow));
 
+    // replace div operator with div operator with check of Division by zero
+    allEquations := List.map(allEquations, addDivExpErrorMsgtoSimEqSystem);
+    odeEquations := List.mapList(odeEquations, addDivExpErrorMsgtoSimEqSystem);
+    algebraicEquations := List.mapList(algebraicEquations, addDivExpErrorMsgtoSimEqSystem);
+    startValueEquations := List.map(startValueEquations, addDivExpErrorMsgtoSimEqSystem);
+    nominalValueEquations := List.map(nominalValueEquations, addDivExpErrorMsgtoSimEqSystem);
+    minValueEquations := List.map(minValueEquations, addDivExpErrorMsgtoSimEqSystem);
+    maxValueEquations := List.map(maxValueEquations, addDivExpErrorMsgtoSimEqSystem);
+    parameterEquations := List.map(parameterEquations, addDivExpErrorMsgtoSimEqSystem);
+    removedEquations := List.map(removedEquations, addDivExpErrorMsgtoSimEqSystem);
+    initialEquations := List.map(initialEquations, addDivExpErrorMsgtoSimEqSystem);
+    removedInitialEquations := List.map(removedInitialEquations, addDivExpErrorMsgtoSimEqSystem);
+
     // update indexNonLinear in SES_NONLINEAR and count
     SymbolicJacsNLS := {};
     (initialEquations, numberofLinearSys, numberofNonLinearSys, numberofMixedSys, numberOfJacobians, SymbolicJacsTemp) := countandIndexAlgebraicLoops(initialEquations, 0, 0, 0, 0, {});
@@ -370,19 +383,6 @@ algorithm
 
     // create model info
     modelInfo := addNumEqnsandNumofSystems(modelInfo, numberofEqns, numberofLinearSys, numberofNonLinearSys, numberofMixedSys, numberOfJacobians);
-
-    // replace div operator with div operator with check of Division by zero
-    allEquations := List.map(allEquations, addDivExpErrorMsgtoSimEqSystem);
-    odeEquations := List.mapList(odeEquations, addDivExpErrorMsgtoSimEqSystem);
-    algebraicEquations := List.mapList(algebraicEquations, addDivExpErrorMsgtoSimEqSystem);
-    startValueEquations := List.map(startValueEquations, addDivExpErrorMsgtoSimEqSystem);
-    nominalValueEquations := List.map(nominalValueEquations, addDivExpErrorMsgtoSimEqSystem);
-    minValueEquations := List.map(minValueEquations, addDivExpErrorMsgtoSimEqSystem);
-    maxValueEquations := List.map(maxValueEquations, addDivExpErrorMsgtoSimEqSystem);
-    parameterEquations := List.map(parameterEquations, addDivExpErrorMsgtoSimEqSystem);
-    removedEquations := List.map(removedEquations, addDivExpErrorMsgtoSimEqSystem);
-    initialEquations := List.map(initialEquations, addDivExpErrorMsgtoSimEqSystem);
-    removedInitialEquations := List.map(removedInitialEquations, addDivExpErrorMsgtoSimEqSystem);
 
     odeEquations := makeEqualLengthLists(odeEquations, Config.noProc());
     algebraicEquations := makeEqualLengthLists(algebraicEquations, Config.noProc());
@@ -7574,6 +7574,7 @@ algorithm
         true = Expression.isConst(e2);
         false = Expression.isZero(e2);
       then (e, source);
+
     case (DAE.BINARY(exp1 = e1, operator = DAE.DIV(ty), exp2 = e2), source)
       then (DAE.CALL(Absyn.IDENT("DIVISION"), {e1, e2}, DAE.CALL_ATTR(ty, false, true, false, false, DAE.NO_INLINE(), DAE.NO_TAIL())), source);
 
@@ -7692,8 +7693,9 @@ algorithm
         simJac1 = List.map(simJac, addDivExpErrorMsgtosimJac);
         symJac = addDivExpErrorMsgtosymJac(symJac);
         elst1 = List.map1(elst, addDivExpErrorMsgtoExp, DAE.emptyElementSource);
+        discEqs1 =  List.map(discEqs, addDivExpErrorMsgtoSimEqSystem);
       then
-        SimCode.SES_LINEAR(SimCode.LINEARSYSTEM(index, partOfMixed, vars, elst1, simJac1, discEqs, symJac, sources, indexSys), NONE());
+        SimCode.SES_LINEAR(SimCode.LINEARSYSTEM(index, partOfMixed, vars, elst1, simJac1, discEqs1, symJac, sources, indexSys), NONE());
 
     case SimCode.SES_NONLINEAR(SimCode.NONLINEARSYSTEM(index=index, eqs=discEqs, crefs=crefs, indexNonLinearSystem=indexSys, jacobianMatrix=symJac, linearTearing=linearTearing, homotopySupport=homotopySupport, mixedSystem=mixedSystem), NONE())
       equation
@@ -7706,16 +7708,22 @@ algorithm
     case SimCode.SES_LINEAR(SimCode.LINEARSYSTEM(index, partOfMixed, vars, elst, simJac, discEqs, symJac, sources, indexSys), SOME(SimCode.LINEARSYSTEM(index1, partOfMixed1, vars1, elst1, simJac1, discEqs1, symJac1, sources1, indexSys1)))
       equation
         simJac = List.map(simJac, addDivExpErrorMsgtosimJac);
+        symJac = addDivExpErrorMsgtosymJac(symJac);
         elst = List.map1(elst, addDivExpErrorMsgtoExp, DAE.emptyElementSource);
+        discEqs =  List.map(discEqs, addDivExpErrorMsgtoSimEqSystem);
         simJac1 = List.map(simJac1, addDivExpErrorMsgtosimJac);
+        symJac1 = addDivExpErrorMsgtosymJac(symJac1);
         elst1 = List.map1(elst1, addDivExpErrorMsgtoExp, DAE.emptyElementSource);
+        discEqs1 =  List.map(discEqs1, addDivExpErrorMsgtoSimEqSystem);
       then
         SimCode.SES_LINEAR(SimCode.LINEARSYSTEM(index, partOfMixed, vars, elst, simJac, discEqs, symJac, sources, indexSys), SOME(SimCode.LINEARSYSTEM(index1, partOfMixed1, vars1, elst1, simJac1, discEqs1, symJac1, sources1, indexSys1)));
 
     case SimCode.SES_NONLINEAR(SimCode.NONLINEARSYSTEM(index=index, eqs=discEqs, crefs=crefs, indexNonLinearSystem=indexSys, jacobianMatrix=symJac, linearTearing=linearTearing, homotopySupport=homotopySupport, mixedSystem=mixedSystem), SOME(SimCode.NONLINEARSYSTEM(index=index1, eqs=discEqs1, crefs=crefs1, indexNonLinearSystem=indexSys1, jacobianMatrix=symJac1, linearTearing=linearTearing1, homotopySupport=homotopySupport1, mixedSystem=mixedSystem1)))
       equation
         discEqs =  List.map(discEqs, addDivExpErrorMsgtoSimEqSystem);
+        symJac = addDivExpErrorMsgtosymJac(symJac);
         discEqs1 =  List.map(discEqs1, addDivExpErrorMsgtoSimEqSystem);
+        symJac1 = addDivExpErrorMsgtosymJac(symJac1);
       then
         SimCode.SES_NONLINEAR(SimCode.NONLINEARSYSTEM(index, discEqs, crefs, indexSys, symJac, linearTearing, homotopySupport, mixedSystem), SOME(SimCode.NONLINEARSYSTEM(index1, discEqs1, crefs1, indexSys1, symJac1, linearTearing1, homotopySupport1, mixedSystem1)));
 

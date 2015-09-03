@@ -302,6 +302,10 @@ int solve_linear_system(DATA *data, int sysNumber)
   struct dataLapackAndTotalPivot *defaultSolverData;
 
   rt_ext_tp_tick(&(linsys->totalTimeClock));
+
+  /* enable to avoid division by zero */
+  data->simulationInfo.noThrowDivZero = 1;
+
   switch(data->simulationInfo.lsMethod)
   {
   case LS_LAPACK:

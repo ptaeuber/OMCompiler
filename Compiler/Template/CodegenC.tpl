@@ -4700,6 +4700,7 @@ template equationNonlinearAlternativeTearing(SimEqSystem eq, Context context, Te
         >>
       ;separator="\n"%>
       retValue = solve_nonlinear_system(data, <%at.indexNonLinearSystem%>);
+      printf("\n\nretVal: %i\n\n", retValue);
 
       /* The casual tearing set found a solution */
       if (retValue == 0){

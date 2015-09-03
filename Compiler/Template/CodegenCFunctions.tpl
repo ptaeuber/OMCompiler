@@ -4686,10 +4686,10 @@ case BINARY(__) then
   case DIV(__) then
     let tvar = tempDecl(expTypeModelica(ty),&varDecls)
     let &preExp += '<%tvar%> = <%e2%>;<%\n%>'
-    // let &preExp +=
-      // if acceptMetaModelicaGrammar()
-        // then 'if (<%tvar%> == 0) {<%generateThrow()%>;}<%\n%>'
-        // else 'if (<%tvar%> == 0) {throwStreamPrint(threadData, "Division by zero %s", "<%Util.escapeModelicaStringToCString(printExpStr(exp))%>");}<%\n%>'
+    let &preExp +=
+      if acceptMetaModelicaGrammar()
+        then 'if (<%tvar%> == 0) {<%generateThrow()%>;}<%\n%>'
+        else 'if (<%tvar%> == 0) {throwStreamPrint(threadData, "Division by zero %s", "<%Util.escapeModelicaStringToCString(printExpStr(exp))%>");}<%\n%>'
     '(<%e1%> / <%e2%>)'
   case POW(__) then
     if isHalf(exp2) then
