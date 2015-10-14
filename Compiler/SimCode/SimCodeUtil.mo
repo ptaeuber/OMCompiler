@@ -6400,6 +6400,7 @@ algorithm
    end match;
 end dumpVar;
 
+
 protected function printVarIndx
   input Option<Integer> i;
   output String s;
@@ -6419,6 +6420,21 @@ algorithm
     print("\n");
   end if;
 end dumpVarLst;
+
+
+public function printVarLstCrefs
+    input list<SimCodeVar.SimVar> inVars;
+    output String str;
+protected
+    DAE.ComponentRef cref;
+    SimCodeVar.SimVar var;
+algorithm
+    str := "\t\tcrefs: ";
+    for var in inVars loop
+        SimCodeVar.SIMVAR(name= cref) := var;
+        str := str + ComponentReference.debugPrintComponentRefTypeStr(cref) + " , ";
+    end for;
+end printVarLstCrefs;
 
 protected function dumpVariablesString "dumps a list of SimCode.Variables to stdout.
 author: Waurich TUD 2014-09"
@@ -6575,7 +6591,7 @@ algorithm
       list<DAE.ComponentRef> crefs,crefs2,conds;
       list<DAE.Statement> stmts;
       list<SimCode.SimEqSystem> elsebranch,discEqs,eqs,eqs2,residual,residual2;
-      list<SimCodeVar.SimVar> vars,discVars;
+      list<SimCodeVar.SimVar> vars,vars2,discVars;
       list<DAE.Exp> beqs;
       list<tuple<DAE.Exp,list<SimCode.SimEqSystem>>> ifbranches;
       list<tuple<Integer, Integer, SimCode.SimEqSystem>> simJac,simJac2;
@@ -6618,9 +6634,10 @@ algorithm
     then s;
 
     // no dynamic tearing
-    case(SimCode.SES_LINEAR(SimCode.LINEARSYSTEM(index=idx,indexLinearSystem=idxLS, residual=residual, jacobianMatrix=jac, simJac=simJac), NONE()))
+    case(SimCode.SES_LINEAR(SimCode.LINEARSYSTEM(index=idx, vars=vars, indexLinearSystem=idxLS, residual=residual, jacobianMatrix=jac, simJac=simJac), NONE()))
       equation
         s = intString(idx) +": "+ " (LINEAR) index:"+intString(idxLS)+" jacobian: "+boolString(Util.isSome(jac))+"\n";
+        s = s + printVarLstCrefs(vars) + "\n";
         s = s+"\t"+stringDelimitList(List.map(residual,dumpSimEqSystem),"\n\t")+"\n";
         s = s+dumpJacobianMatrix(jac)+"\n";
         s = s+"\tsimJac:\n"+dumpSimJac(simJac)+"\n";
@@ -6635,13 +6652,15 @@ algorithm
     then s;
 
     // dynamic tearing
-    case(SimCode.SES_LINEAR(SimCode.LINEARSYSTEM(index=idx,indexLinearSystem=idxLS, residual=residual, jacobianMatrix=jac, simJac=simJac), SOME(SimCode.LINEARSYSTEM(index=idx2,indexLinearSystem=idxLS2, residual=residual2, jacobianMatrix=jac2, simJac=simJac2))))
+    case(SimCode.SES_LINEAR(SimCode.LINEARSYSTEM(index=idx, vars=vars, indexLinearSystem=idxLS, residual=residual, jacobianMatrix=jac, simJac=simJac), SOME(SimCode.LINEARSYSTEM(index=idx2, vars=vars2, indexLinearSystem=idxLS2, residual=residual2, jacobianMatrix=jac2, simJac=simJac2))))
       equation
         s1 = "strict set:\n" + intString(idx) +": "+ " (LINEAR) index:"+intString(idxLS)+" jacobian: "+boolString(Util.isSome(jac))+"\n";
+        s1 = s1 + printVarLstCrefs(vars) + "\n";
         s1 = s1+"\t"+stringDelimitList(List.map(residual,dumpSimEqSystem),"\n\t")+"\n";
         s1 = s1+"\tsimJac:\n"+dumpSimJac(simJac)+"\n";
         s1 = s1+dumpJacobianMatrix(jac)+"\n";
         s2 = "\ncasual set:\n" + intString(idx2) +": "+ " (LINEAR) index:"+intString(idxLS2)+" jacobian: "+boolString(Util.isSome(jac))+"\n";
+        s2 = s2 + printVarLstCrefs(vars2) + "\n";
         s2 = s2+"\t"+stringDelimitList(List.map(residual2,dumpSimEqSystem),"\n\t")+"\n";
         s2 = s2+"\tsimJac:\n"+dumpSimJac(simJac2)+"\n";
         s2 = s2+dumpJacobianMatrix(jac2)+"\n";

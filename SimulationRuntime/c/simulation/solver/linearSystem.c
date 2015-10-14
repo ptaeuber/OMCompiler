@@ -211,8 +211,8 @@ void printLinearSystemSolvingStatistics(DATA *data, int sysNumber, int logLevel)
                                (int)linsys[sysNumber].equationIndex, (int)linsys[sysNumber].size, (int)linsys[sysNumber].nnz,
                                (((double) linsys[sysNumber].nnz) / ((double)(linsys[sysNumber].size*linsys[sysNumber].size)))*100 );
   infoStreamPrint(logLevel, 0, " number of calls                : %ld", linsys[sysNumber].numberOfCall);
-  infoStreamPrint(logLevel, 0, " average time per call          : %f", linsys[sysNumber].totalTime/linsys[sysNumber].numberOfCall);
-  infoStreamPrint(logLevel, 0, " total time                     : %f", linsys[sysNumber].totalTime);
+  infoStreamPrint(logLevel, 0, " average time per call          : %g", linsys[sysNumber].totalTime/linsys[sysNumber].numberOfCall);
+  infoStreamPrint(logLevel, 0, " total time                     : %g", linsys[sysNumber].totalTime);
   messageClose(logLevel);
 }
 
@@ -320,6 +320,11 @@ int solve_linear_system(DATA *data, threadData_t *threadData, int sysNumber)
 #ifdef WITH_UMFPACK
   case LS_UMFPACK:
     success = solveUmfPack(data, threadData, sysNumber);
+    if (!success && linsys->strictTearingFunctionCall != NULL){
+      debugString(LOG_DT, "Solving the casual tearing set failed! Now the strict tearing set is used.");
+      success = linsys->strictTearingFunctionCall(data, threadData);
+      if (success) success=2;
+    }
     break;
 #else
   case LS_UMFPACK:
@@ -341,8 +346,13 @@ int solve_linear_system(DATA *data, threadData_t *threadData, int sysNumber)
     if (!success && linsys->strictTearingFunctionCall != NULL){
       debugString(LOG_DT, "Solving the casual tearing set failed! Now the strict tearing set is used.");
       success = linsys->strictTearingFunctionCall(data, threadData);
-      if (success) success=2;
-      linsys->failed = 1;
+      if (success){
+        success=2;
+        linsys->failed = 0;
+      }
+      else{
+        linsys->failed = 1;
+      }
     }
     else{
     /* if there is no alternative tearing set, use fallback solver */

@@ -4556,7 +4556,11 @@ case e as SES_LINEAR(lSystem=ls as LINEARSYSTEM(__), alternativeTearing = at) th
   <<
   /* Linear equation system */
   int retValue;
-  debugDouble(LOG_DT, "Solving linear system <%ls.index%> (STRICT TEARING SET if tearing enabled) at time =", time);
+  if(ACTIVE_STREAM(LOG_DT))
+      {
+        infoStreamPrint(LOG_DT, 1, "Solving linear system <%ls.index%> (STRICT TEARING SET if tearing enabled) at time = %18.10e", data->localData[0]->timeValue);
+        messageClose(LOG_DT);
+      }
   <% if profileSome() then 'SIM_PROF_TICK_EQ(modelInfoGetEquation(&data->modelData.modelDataXml,<%ls.index%>).profileBlockIndex);' %>
   <%ls.vars |> SIMVAR(__) hasindex i0 => 'data->simulationInfo.linearSystemData[<%ls.indexLinearSystem%>].x[<%i0%>] = _<%cref(name)%>(1);' ;separator="\n"%>
   retValue = solve_linear_system(data, threadData, <%ls.indexLinearSystem%>);
@@ -4583,7 +4587,11 @@ case e as SES_LINEAR(lSystem=ls as LINEARSYSTEM(__), alternativeTearing = SOME(a
   <<
   /* Linear equation system */
   int retValue;
-  debugDouble(LOG_DT, "Solving linear system <%at.index%> (CASUAL TEARING SET) at time =", time);
+  if(ACTIVE_STREAM(LOG_DT))
+      {
+        infoStreamPrint(LOG_DT, 1, "Solving linear system <%at.index%> (CASUAL TEARING SET, strict: <%ls.index%>) at time = %18.10e", data->localData[0]->timeValue);
+        messageClose(LOG_DT);
+      }
   <% if profileSome() then 'SIM_PROF_TICK_EQ(modelInfoGetEquation(&data->modelData.modelDataXml,<%at.index%>).profileBlockIndex);' %>
   <%at.vars |> SIMVAR(__) hasindex i0 => 'data->simulationInfo.linearSystemData[<%at.indexLinearSystem%>].x[<%i0%>] = _<%cref(name)%>(1);' ;separator="\n"%>
   retValue = solve_linear_system(data, threadData, <%at.indexLinearSystem%>);
@@ -4679,7 +4687,7 @@ template equationNonlinearAlternativeTearing(SimEqSystem eq, Context context, Te
       int retValue;
       if(ACTIVE_STREAM(LOG_DT))
       {
-        infoStreamPrint(LOG_DT, 1, "Solving nonlinear system <%at.index%> (CASUAL TEARING SET) at time = %18.10e", data->localData[0]->timeValue);
+        infoStreamPrint(LOG_DT, 1, "Solving nonlinear system <%at.index%> (CASUAL TEARING SET, strict: <%nls.index%>) at time = %18.10e", data->localData[0]->timeValue);
         messageClose(LOG_DT);
       }
       <% if profileSome() then
@@ -4698,7 +4706,6 @@ template equationNonlinearAlternativeTearing(SimEqSystem eq, Context context, Te
         >>
       ;separator="\n"%>
       retValue = solve_nonlinear_system(data, threadData, <%at.indexNonLinearSystem%>);
-      printf("\n\nretVal: %i\n\n", retValue);
       /* The casual tearing set found a solution */
       if (retValue == 0){
       /* write solution */
