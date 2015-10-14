@@ -2848,7 +2848,7 @@ algorithm
     local Boolean b;
     case BackendDAE.SOLVABILITY_SOLVED() then "solved";
     case BackendDAE.SOLVABILITY_CONSTONE() then "constone";
-    case BackendDAE.SOLVABILITY_CONST() then "const";
+    case BackendDAE.SOLVABILITY_CONST(b=b) then "const(" + boolString(b) + ")";
     case BackendDAE.SOLVABILITY_PARAMETER(b=b) then "param(" + boolString(b) + ")";
     case BackendDAE.SOLVABILITY_LINEAR(b=b) then "variable(" + boolString(b) + ")";
     case BackendDAE.SOLVABILITY_NONLINEAR() then "nonlinear";
