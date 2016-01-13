@@ -4785,6 +4785,7 @@ algorithm
   outSolvab := match(inSolvab)
     case BackendDAE.SOLVABILITY_CONST(b=false) then BackendDAE.SOLVABILITY_CONST(false);
     case BackendDAE.SOLVABILITY_PARAMETER(b=false) then BackendDAE.SOLVABILITY_PARAMETER(false);
+    case BackendDAE.SOLVABILITY_LINEAR(b=false) then BackendDAE.SOLVABILITY_LINEAR(false);
     else then BackendDAE.SOLVABILITY_SOLVABLE();
   end match;
 end transformSolvabilityForCasualTearingSet;

@@ -1041,7 +1041,7 @@ int solveSystemWithTotalPivotSearch(int n, double* x, double* A, int* indRow, in
   for (i=n-1;i>=0; i--) {
     if (i>=*rank) {
       /* this criteria should be evaluated and may be improved in future */
-      if (fabs(A[indRow[i] + indCol[n]*n])>1e-12) {
+      if (fabs(A[indRow[i] + indCol[n]*n])>1e-6) {
         warningStreamPrint(LOG_NLS, 0, "under-determined linear system not solvable!");
         return -1;
       } else {
