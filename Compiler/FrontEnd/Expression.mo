@@ -7197,7 +7197,7 @@ algorithm
       Integer ival;
       Real rval;
       Type t;
-      DAE.Exp e;
+      DAE.Exp e,e1;
       list<DAE.Exp> ae;
       list<list<DAE.Exp>> matrix;
 
@@ -7212,6 +7212,8 @@ algorithm
       then List.mapListAllValueBool(matrix,isZeroOrAlmostZero,true);
 
     case(DAE.UNARY(DAE.UMINUS_ARR(_),e)) then isZeroOrAlmostZero(e);
+
+    case(DAE.IFEXP(_,e,e1)) then (isZeroOrAlmostZero(e) or isZeroOrAlmostZero(e1));
 
     else false;
 
