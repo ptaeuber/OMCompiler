@@ -34,8 +34,8 @@
 #include <stdio.h>
 #include <assert.h>
 #include <string.h>
-#include "gc.h"
-#include "meta/meta_modelica.h"
+#include "meta/meta_modelica_data.h"
+#include "omc_error.h"
 
 #define FMT_BUFSIZE 400
 
@@ -231,9 +231,12 @@ modelica_string modelica_boolean_to_modelica_string(modelica_boolean b, modelica
 
 /* Convert a modelica_enumeration to a modelica_string, used in String(b) */
 
-modelica_string modelica_enumeration_to_modelica_string(modelica_integer nr,const modelica_string e[],modelica_integer minLen, modelica_boolean leftJustified)
+modelica_string enum_to_modelica_string(modelica_integer nr, const char *e[],modelica_integer minLen, modelica_boolean leftJustified)
 {
-  return mmc_mk_scon(e[nr-1]);
+  size_t sz = snprintf(NULL, 0, leftJustified ? "%-*s" : "%*s", (int) minLen, e[nr-1]);
+  void *res = alloc_modelica_string(sz);
+  sprintf(MMC_STRINGDATA(res), leftJustified ? "%-*s" : "%*s", (int) minLen, e[nr-1]);
+  return res;
 }
 
 modelica_string alloc_modelica_string(int length)
@@ -277,7 +280,7 @@ extern char* omc__escapedString(const char* str, int nl)
   if (!hasEscape) {
     return NULL;
   }
-  res = (char*) GC_malloc(len+1);
+  res = (char*) omc_alloc_interface.malloc_atomic(len+1);
   while(*str) {
     switch (*str) {
       case '"': res[i++] = '\\'; res[i++] = '"'; break;
@@ -298,9 +301,11 @@ extern char* omc__escapedString(const char* str, int nl)
 
 int GC_vasprintf(char **strp, const char *fmt, va_list ap) {
   int len;
+  va_list ap2;
+  va_copy(ap2, ap);
   len = vsnprintf(NULL, 0, fmt, ap);
-  *strp = GC_malloc_atomic(len+1);
-  len = vsnprintf(*strp, len+1, fmt, ap);
+  *strp = omc_alloc_interface.malloc_atomic(len+1);
+  len = vsnprintf(*strp, len+1, fmt, ap2);
   return len;
 }
 

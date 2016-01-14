@@ -72,16 +72,15 @@ algorithm
   outDAE := match inDAE
     local
       BackendDAE.EqSystem syst;
-      list<BackendDAE.EqSystem> systs;
       BackendDAE.Shared shared;
 
-    case (BackendDAE.DAE({syst}, shared)) guard(not Flags.isSet(Flags.NO_PARTITIONING))
-      then clockPartitioning1(syst, shared);
+    case (BackendDAE.DAE({syst}, shared))
+    then clockPartitioning1(syst, shared);
+
     // TODO: Improve support for partitioned systems of equations
-    case _ guard(not Flags.isSet(Flags.NO_PARTITIONING)) equation
+    else equation
       BackendDAE.DAE({syst}, shared) = BackendDAEOptimize.collapseIndependentBlocks(inDAE);
     then clockPartitioning1(syst, shared);
-    else inDAE;
   end match;
 end clockPartitioning;
 
@@ -112,21 +111,14 @@ protected function clockPartitioning1
   input BackendDAE.Shared inShared;
   output BackendDAE.BackendDAE outDAE;
 protected
-  Integer i;
   BackendDAE.EqSystem syst;
   list<BackendDAE.EqSystem> contSysts, clockedSysts;
-  array<BackendDAE.BasePartition> basePartitions;
-  array<BackendDAE.SubPartition> subPartitions;
   BackendDAE.Shared shared = inShared;
   list<BackendDAE.EqSystem> systs;
-  BackendDAE.Variables vars;
-  BackendDAE.EquationArray eqs;
-  BackendDAE.BaseClockPartitionKind partitionKind;
   list<DAE.ComponentRef> holdComps;
-  array<Integer> varsPartition;
   list<BackendDAE.Equation> unpartRemEqs;
 algorithm
-  syst := substituteParitionOpExps(inSyst);
+  syst := substitutePartitionOpExps(inSyst, inShared);
 
   (contSysts, clockedSysts, unpartRemEqs) := baseClockPartitioning(syst, shared);
 
@@ -155,7 +147,6 @@ protected function createBoolClockWhenClauses
   output list<BackendDAE.Equation> outRemovedEqs = inRemovedEqs;
 protected
   BackendDAE.BasePartition basePartition;
-  list<BackendDAE.Equation> eqs = {};
 algorithm
   for i in 1:arrayLength(inShared.partitionsInfo.basePartitions) loop
     basePartition := inShared.partitionsInfo.basePartitions[i];
@@ -182,7 +173,6 @@ protected function makePreviousFixed
 protected
   BackendDAE.Equation eq;
   list<DAE.ComponentRef> prevVars = {};
-  BackendDAE.EqSystem syst;
   array<Boolean> isPrevVarArr;
   list<Integer> varIxs;
   BackendDAE.Var var;
@@ -233,7 +223,7 @@ algorithm
   (outExp, outPrevVars) := Expression.traverseExpBottomUp(inExp, collectPrevVars1, inPrevVars);
 end collectPrevVars;
 
-public function collectPrevVars1
+protected function collectPrevVars1
   input DAE.Exp inExp;
   input list<DAE.ComponentRef> inPrevCompRefs;
   output DAE.Exp outExp = inExp;
@@ -257,13 +247,10 @@ protected function subClockPartitioning1
   output BackendDAE.Shared outShared = inShared;
 protected
   DAE.ClockKind baseClock;
-  BackendDAE.Variables vars;
-  BackendDAE.EquationArray eqs;
   HashTable.HashTable varsPartition;
   Integer i, j, n, nBaseClocks;
   DAE.ComponentRef cr;
   array<Boolean> hasHoldOperator;
-  BackendDAE.BaseClockPartitionKind partitionKind;
   list<BackendDAE.EqSystem> systs;
   list<BackendDAE.SubClock> lstSubClocks1, lstSubClocks = {};
   BackendDAE.PartitionsInfo partitionsInfo;
@@ -387,7 +374,7 @@ protected
   BackendDAE.Variables vars, clockVars;
   BackendDAE.EqSystem clockSyst;
   BackendDAE.IncidenceMatrix m, mT, rm, rmT;
-  Integer i, partitionsCnt;
+  Integer partitionsCnt;
   array<Integer> partitions, reqsPartitions;
   list<BackendDAE.Equation> newClockEqs;
   list<BackendDAE.Var> newClockVars;
@@ -395,13 +382,10 @@ protected
   array<tuple<BackendDAE.SubClock, Integer>> subclocksTree;
   BackendDAE.StrongComponents clockComps;
   array<Integer> subclksCnt;
-  list<BackendDAE.EqSystem> systs;
   array<Integer> order;
   array<BackendDAE.SubClock> subclocks;
   array<Boolean> clockedEqsMask, clockedVarsMask;
-  list<Integer> varIxs;
 algorithm
-
   funcs := BackendDAEUtil.getFunctions(inShared);
   BackendDAE.EQSYSTEM(orderedVars = vars, orderedEqs = eqs) := inEqSystem;
 
@@ -452,8 +436,6 @@ end subClockPartitioning;
 protected function maskMatrix
   input array<list<Integer>> m;
   input array<Boolean> mask;
-protected
-  list<Integer> ixs;
 algorithm
   for i in 1:arrayLength(m) loop
     if not mask[i] then
@@ -481,11 +463,8 @@ protected function resolveClocks
   output array<tuple<BackendDAE.SubClock, Integer>> outSubClocks;
   output DAE.ClockKind outClockKind = DAE.INFERRED_CLOCK();
 protected
-  Integer i;
   BackendDAE.Equation eq;
-  DAE.ComponentRef cr;
   DAE.Exp exp;
-  BackendDAE.Var var;
   DAE.ClockKind clockKind;
   tuple<BackendDAE.SubClock, Integer> subClock;
   BackendDAE.StrongComponent comp;
@@ -642,7 +621,6 @@ protected
   DAE.ComponentRef cr;
   Integer varIdx, parent;
   list<Integer> lstParents;
-
 algorithm
   clkName := "$subclk" + intString(partitionIdx) + "_" + intString(clkIdx);
   cr := DAE.CREF_IDENT(clkName, DAE.T_CLOCK_DEFAULT, {});
@@ -1129,9 +1107,8 @@ protected function collectSubclkInfo
   output array<Integer> oClksCnt;
 protected
   BackendDAE.Equation eq;
-  Integer i, j, eqsSize, cnt;
+  Integer i, j, cnt;
   BackendDAE.Equation eq;
-  list<Integer> intLst;
   DAE.ComponentRef cr;
   BackendDAE.Var var;
   array<list<Integer>> partitionsWhenClocks;
@@ -1200,14 +1177,13 @@ algorithm
           Integer whenIdx;
           Boolean diff;
           list<Integer> partitionsWhenClocksLst;
-          BackendDAE.LoopInfo loopInfo;
-        case BackendDAE.EQUATION_ATTRIBUTES(diff, BackendDAE.CLOCKED_EQUATION(whenIdx), loopInfo)
+        case BackendDAE.EQUATION_ATTRIBUTES(diff, BackendDAE.CLOCKED_EQUATION(whenIdx))
           algorithm
             partitionsWhenClocksLst := partitionsWhenClocks[partitionIdx];
             if whenIdx <> 0 and List.notMember(whenIdx, partitionsWhenClocksLst) then
               arrayUpdate(partitionsWhenClocks, partitionIdx, whenIdx::partitionsWhenClocksLst);
             end if;
-          then BackendDAE.EQUATION_ATTRIBUTES(diff, BackendDAE.DYNAMIC_EQUATION(), loopInfo);
+          then BackendDAE.EQUATION_ATTRIBUTES(diff, BackendDAE.DYNAMIC_EQUATION());
         else eqAttr;
       end match;
       eq := BackendEquation.setEquationAttributes(eq, eqAttr);
@@ -1239,7 +1215,6 @@ protected function splitClockEqs
 protected
   list<BackendDAE.Equation> clockEqs = {};
   BackendDAE.Equation eq;
-  Boolean notClock;
   Integer i;
 algorithm
   outClockEqsMask := arrayCreate(BackendDAEUtil.equationArraySize(inEqs), true);
@@ -1272,136 +1247,159 @@ algorithm
   outClockVars := BackendVariable.listVar(clockVars);
 end splitClockVars;
 
-protected function substituteParitionOpExps
+protected function substitutePartitionOpExps
 "Each non-trivial expression (non-literal, non-constant, non-parameter, non-variable), expr_i, appearing
  as first argument of any clock conversion operator or in base clock constructor is recursively replaced by a unique variable, $var_i,
  and the equation $var_i = expr_i is added to the equation set.
  Also when clauses are created for boolean clocks."
   input BackendDAE.EqSystem inSyst;
-  output BackendDAE.EqSystem outSyst;
-algorithm
-  outSyst := match inSyst
-    local
-      BackendDAE.Variables vars;
-      BackendDAE.EquationArray eqs;
-      BackendDAE.EqSystem syst;
-      list<BackendDAE.Equation> newEqs = {};
-      list<BackendDAE.Var> newVars = {};
-      Integer cnt = 1;
-      BackendDAE.Equation eq;
-    case syst as BackendDAE.EQSYSTEM(orderedVars=vars, orderedEqs=eqs)
-      algorithm
-        for i in 1:BackendDAEUtil.equationArraySize(eqs) loop
-          eq := BackendEquation.equationNth1(eqs, i);
-          (eq, (newEqs, newVars, cnt)) :=
-          BackendEquation.traverseExpsOfEquation(eq, substituteParitionOpExp, (newEqs, newVars, cnt));
-          newEqs := eq::newEqs;
-        end for;
-        syst.orderedEqs := BackendEquation.listEquation(listReverse(newEqs));
-        syst.orderedVars := BackendVariable.addVars(newVars, vars);
-      then BackendDAEUtil.clearEqSyst(syst);
-  end match;
-end substituteParitionOpExps;
-
-protected function substituteParitionOpExp
-  input DAE.Exp inExp;
-  input tuple<list<BackendDAE.Equation>,list<BackendDAE.Var>, Integer> inTpl;
-  output DAE.Exp outExp;
-  output tuple<list<BackendDAE.Equation>,list<BackendDAE.Var>, Integer> outTpl;
-algorithm
-  (outExp, outTpl) := Expression.traverseExpBottomUp(inExp, substituteParitionOpExp1, inTpl);
-end substituteParitionOpExp;
-
-protected function substituteParitionOpExp1
-  input DAE.Exp inExp;
-  input tuple<list<BackendDAE.Equation>,list<BackendDAE.Var>, Integer> inTpl;
-  output DAE.Exp outExp;
-  output tuple<list<BackendDAE.Equation>,list<BackendDAE.Var>, Integer> outTpl;
+  input BackendDAE.Shared inShared;
+  output BackendDAE.EqSystem outSyst = inSyst;
 protected
+  list<BackendDAE.Equation> newEqs = {};
+  list<BackendDAE.Var> newVars = {};
+  Integer cnt = 1;
+  BackendDAE.Equation eq;
+algorithm
+  for i in 1:BackendDAEUtil.equationArraySize(inSyst.orderedEqs) loop
+    eq := BackendEquation.equationNth1(inSyst.orderedEqs, i);
+    (eq, (newEqs, newVars, cnt, _)) := BackendEquation.traverseExpsOfEquation(eq, substitutePartitionOpExp, (newEqs, newVars, cnt, inShared));
+    newEqs := eq::newEqs;
+  end for;
+  outSyst.orderedEqs := BackendEquation.listEquation(listReverse(newEqs));
+  outSyst.orderedVars := BackendVariable.addVars(newVars, inSyst.orderedVars);
+  outSyst := BackendDAEUtil.clearEqSyst(outSyst);
+end substitutePartitionOpExps;
+
+protected function substitutePartitionOpExp
+  input DAE.Exp inExp;
+  input tuple<list<BackendDAE.Equation>,list<BackendDAE.Var>, Integer, BackendDAE.Shared> inTpl;
+  output DAE.Exp outExp;
+  output tuple<list<BackendDAE.Equation>,list<BackendDAE.Var>, Integer, BackendDAE.Shared> outTpl;
+algorithm
+  (outExp, outTpl) := Expression.traverseExpBottomUp(inExp, substitutePartitionOpExp1, inTpl);
+end substitutePartitionOpExp;
+
+protected function substitutePartitionOpExp1
+  input DAE.Exp inExp;
+  input tuple<list<BackendDAE.Equation>,list<BackendDAE.Var>, Integer, BackendDAE.Shared> inTpl;
+  output DAE.Exp outExp;
+  output tuple<list<BackendDAE.Equation>,list<BackendDAE.Var>, Integer, BackendDAE.Shared> outTpl;
+protected
+  Absyn.Path path;
+  BackendDAE.Shared shared;
+  DAE.CallAttributes attr;
+  DAE.ClockKind clk;
+  Integer cnt;
   list<BackendDAE.Equation> newEqs;
   list<BackendDAE.Var> newVars;
-  Integer cnt;
+  list<DAE.Exp> exps;
 algorithm
-  (newEqs, newVars, cnt) := inTpl;
+  (newEqs, newVars, cnt, shared) := inTpl;
   (outExp, outTpl) := match inExp
-    local
-      Absyn.Path path;
-      list<DAE.Exp> exps;
-      DAE.CallAttributes attr;
-      DAE.ClockKind clk;
-    case DAE.CLKCONST(clk)
-      equation
-        (clk, newEqs, newVars, cnt) = substClock(clk, newEqs, newVars, cnt);
-      then
-        (DAE.CLKCONST(clk), (newEqs, newVars, cnt));
-    case DAE.CALL(path = path, expLst = exps, attr = attr)
-      then
-        substituteExpsCall(path, exps, attr, newEqs, newVars, cnt);
-    else
-      (inExp, inTpl);
+    case DAE.CLKCONST(clk) equation
+      (clk, newEqs, newVars, cnt) = substClock(clk, newEqs, newVars, cnt, shared);
+    then (DAE.CLKCONST(clk), (newEqs, newVars, cnt, shared));
+
+    case DAE.CALL(path=path, expLst=exps, attr=attr)
+    then substituteExpsCall(path, exps, attr, newEqs, newVars, cnt, shared);
+
+    else (inExp, inTpl);
   end match;
-end substituteParitionOpExp1;
+end substitutePartitionOpExp1;
 
 protected function substClock
   input DAE.ClockKind inClk;
   input list<BackendDAE.Equation> inNewEqs;
   input list<BackendDAE.Var> inNewVars;
   input Integer inCnt;
+  input BackendDAE.Shared inShared;
   output DAE.ClockKind outClk;
   output list<BackendDAE.Equation> outNewEqs;
   output list<BackendDAE.Var> outNewVars;
   output Integer outCnt;
+protected
+  DAE.Exp e;
+  Integer cnt;
+  Integer i;
+  Real f;
+  list<BackendDAE.Equation> eqs;
+  list<BackendDAE.Var> vars;
 algorithm
   (outClk, outNewEqs, outNewVars, outCnt) := match inClk
-    local
-      DAE.Exp e;
-      Integer i;
-      Real f;
-      list<BackendDAE.Equation> eqs;
-      list<BackendDAE.Var> vars;
-      Integer cnt;
-    case DAE.BOOLEAN_CLOCK(e, f)
-      equation
-        ({e}, eqs, vars, cnt) = substExp({e}, inNewEqs, inNewVars, inCnt);
-      then
-        (DAE.BOOLEAN_CLOCK(e, f), eqs, vars, cnt);
-    case DAE.REAL_CLOCK(e)
-      equation
-        (e, eqs, vars, cnt) = substClockExp(e, inNewEqs, inNewVars, inCnt);
-      then
-        (DAE.REAL_CLOCK(e), eqs, vars, cnt);
-    case DAE.INTEGER_CLOCK(e, i)
-      equation
-        (e, eqs, vars, cnt) = substClockExp(e, inNewEqs, inNewVars, inCnt);
-      then
-        (DAE.INTEGER_CLOCK(e, i), eqs, vars, cnt);
-    else
-      (inClk, inNewEqs, inNewVars, inCnt);
+    case DAE.BOOLEAN_CLOCK(e, f) equation
+      ({e}, eqs, vars, cnt) = substExp({e}, inNewEqs, inNewVars, inCnt);
+    then (DAE.BOOLEAN_CLOCK(e, f), eqs, vars, cnt);
+
+    case DAE.REAL_CLOCK(e) equation
+      (e, eqs, vars, cnt) = substClockExp(e, inNewEqs, inNewVars, inCnt, inShared);
+    then (DAE.REAL_CLOCK(e), eqs, vars, cnt);
+
+    case DAE.INTEGER_CLOCK(e, i) equation
+      (e, eqs, vars, cnt) = substClockExp(e, inNewEqs, inNewVars, inCnt, inShared);
+    then (DAE.INTEGER_CLOCK(e, i), eqs, vars, cnt);
+
+    else (inClk, inNewEqs, inNewVars, inCnt);
   end match;
 end substClock;
+
+protected function isKnownOrConstantExp "author: lochel
+  Returns true if the given expression is constant or at least known (parameter dependent)."
+  input DAE.Exp inExp;
+  input BackendDAE.Variables inKnownVars;
+  output Boolean outKnown;
+algorithm
+  (_, (outKnown, _)) := Expression.traverseExpTopDown(inExp, isKnownOrConstantExp_traverser, (true, inKnownVars));
+end isKnownOrConstantExp;
+
+protected function isKnownOrConstantExp_traverser
+  input DAE.Exp inExp;
+  input tuple<Boolean, BackendDAE.Variables> inTpl;
+  output DAE.Exp outExp = inExp;
+  output Boolean outContinue;
+  output tuple<Boolean, BackendDAE.Variables> outTpl;
+protected
+  BackendDAE.Variables knownVars;
+  Boolean isKnown;
+algorithm
+  (isKnown, knownVars) := inTpl;
+  isKnown := match inExp
+    local
+      DAE.ComponentRef componentRef;
+    case DAE.CALL() then false;
+    case DAE.CREF(componentRef=componentRef) then BackendVariable.containsCref(componentRef, knownVars);
+    else isKnown;
+  end match;
+
+  outTpl := (isKnown, knownVars);
+  outContinue := isKnown;
+end isKnownOrConstantExp_traverser;
 
 protected function substClockExp
   input DAE.Exp inExp;
   input list<BackendDAE.Equation> inNewEqs;
   input list<BackendDAE.Var> inNewVars;
   input Integer inCnt;
+  input BackendDAE.Shared inShared;
   output DAE.Exp outExp;
   output list<BackendDAE.Equation> outNewEqs;
   output list<BackendDAE.Var> outNewVars;
   output Integer outCnt;
 protected
-  DAE.Exp e;
-  list<BackendDAE.Equation> eqs;
-  list<BackendDAE.Var> vars;
-  Integer cnt;
+  DAE.Type ty;
 algorithm
-  ({outExp}, outNewEqs, outNewVars, outCnt) := substExp({inExp}, inNewEqs, inNewVars, inCnt);
-  outExp := match outExp
-    local DAE.Type ty;
-    case DAE.CREF(_, ty)
-      then Expression.makePureBuiltinCall("previous", {outExp}, ty);
-    else outExp;
-  end match;
+  if isKnownOrConstantExp(inExp, inShared.knownVars) then
+    outExp := inExp;
+    outNewEqs := inNewEqs;
+    outNewVars := inNewVars;
+    outCnt := inCnt;
+  else
+    ({outExp}, outNewEqs, outNewVars, outCnt) := substExp({inExp}, inNewEqs, inNewVars, inCnt);
+    outExp := match outExp
+      case DAE.CREF(_, ty) then Expression.makePureBuiltinCall("previous", {outExp}, ty);
+      else outExp;
+    end match;
+  end if;
 end substClockExp;
 
 protected function substituteExpsCall
@@ -1411,8 +1409,9 @@ protected function substituteExpsCall
   input list<BackendDAE.Equation> inEqs;
   input list<BackendDAE.Var> inVars;
   input Integer inCnt;
+  input BackendDAE.Shared inShared;
   output DAE.Exp outExp;
-  output tuple<list<BackendDAE.Equation>,list<BackendDAE.Var>, Integer> outTpl;
+  output tuple<list<BackendDAE.Equation>,list<BackendDAE.Var>, Integer, BackendDAE.Shared> outTpl;
 protected
   Boolean replace;
   list<DAE.Exp> exps;
@@ -1434,7 +1433,7 @@ algorithm
       if replace then substExp(inExps, inEqs, inVars, inCnt)
                  else (inExps, inEqs, inVars, inCnt);
   outExp := DAE.CALL(inPath, exps, inAttr);
-  outTpl := (eqs, vars, cnt);
+  outTpl := (eqs, vars, cnt, inShared);
 end substituteExpsCall;
 
 protected function createVar
@@ -1472,10 +1471,6 @@ protected function substExp
   input Integer inCnt;
   output tuple<list<DAE.Exp>, list<BackendDAE.Equation>, list<BackendDAE.Var>, Integer> outTpl;
 protected
-  list<DAE.Exp> exps;
-  list<BackendDAE.Equation> eqs;
-  list<BackendDAE.Var> vars;
-  Integer cnt;
   Boolean create;
   DAE.Exp e;
 algorithm
@@ -1485,8 +1480,8 @@ algorithm
     case DAE.RCONST() then false;
     case DAE.SCONST() then false;
     case DAE.BCONST() then false;
-    case DAE.CLKCONST() then false;
     case DAE.ENUM_LITERAL() then false;
+    case DAE.CLKCONST() then true;
     else true;
   end match;
   outTpl := match create
@@ -1523,23 +1518,6 @@ algorithm
   end matchcontinue;
 end getVarIxs;
 
-protected function getVars
-  input DAE.ComponentRef inComp;
-  input BackendDAE.Variables inVariables;
-  output list<BackendDAE.Var> outIntegerLst;
-algorithm
-  outIntegerLst := matchcontinue inComp
-    local
-      list<BackendDAE.Var> vars;
-    case _
-      equation
-        (vars, _) = BackendVariable.getVar(inComp, inVariables);
-      then vars;
-    else
-      then {};
-  end matchcontinue;
-end getVars;
-
 protected function baseClockPartitioning
 "Do base clock partitioning and detect kind of new partitions(clocked or continuous)."
   input BackendDAE.EqSystem inSyst;
@@ -1554,7 +1532,7 @@ protected
   BackendDAE.IncidenceMatrix m, mT, rm, rmT;
   BackendDAE.EqSystem syst;
   BackendDAE.EqSystems systs;
-  Integer partitionCnt, i, j, eqIdx;
+  Integer partitionCnt, i, j;
   DAE.ComponentRef cr;
   list<Integer> varIxs;
   BackendDAE.EqSystem syst;
@@ -1591,7 +1569,7 @@ algorithm
   //Detect clocked equations and variables
   for j in 1:BackendDAEUtil.equationArraySize(eqs) loop
     eq := BackendEquation.equationNth1(eqs, j);
-    (partitionType, refsInfo) := detectEqPatition(eq);
+    (partitionType, refsInfo) := detectEqPartition(eq);
     info := BackendEquation.equationInfo(eq);
     arrayUpdate(clockedEqs, j, setClockedPartition(partitionType, arrayGet(clockedEqs, j), NONE(), info));
     for refInfo in refsInfo loop
@@ -1696,7 +1674,7 @@ algorithm
   end match;
 end isClockEquation;
 
-protected function detectEqPatition
+protected function detectEqPartition
 "Detect clocked equation and variables according the rule:
  - variable u in sample(u) and a variable y in y = hold(ud) is in a continuous-time partition;
  - variables u and y in y = sample(uc), y = subSample(u), y = superSample(u), y =
@@ -1718,23 +1696,11 @@ algorithm
   end match;
   info := BackendEquation.equationInfo(inEq);
   (_, (partitionType, refsInfo, _)) :=
-      BackendEquation.traverseExpsOfEquation(inEq, detectEqPatitionExp, (partitionType, {}, info));
+      BackendEquation.traverseExpsOfEquation(inEq, detectEqPartitionExp, (partitionType, {}, info));
   isClockEq := isClockEquation(inEq);
   outPartitionType := if isClockEq then setClockedPartition(SOME(true), partitionType, NONE(), info)
                                    else partitionType;
-end detectEqPatition;
-
-protected function reverseBoolOption
-  input Option<Boolean> inp;
-  output Option<Boolean> out;
-algorithm
-  out := match inp
-    local
-      Boolean v;
-    case SOME(v) then SOME(not v);
-    else inp;
-  end match;
-end reverseBoolOption;
+end detectEqPartition;
 
 protected function printPartitionType
   input Option<Boolean> isClockedPartition;
@@ -1747,16 +1713,16 @@ algorithm
   end match;
 end printPartitionType;
 
-protected function detectEqPatitionExp
+protected function detectEqPartitionExp
   input DAE.Exp inExp;
   input tuple<Option<Boolean>, list<tuple<DAE.ComponentRef, Boolean>>, SourceInfo> inTpl;
   output DAE.Exp outExp;
   output tuple<Option<Boolean>, list<tuple<DAE.ComponentRef, Boolean>>, SourceInfo> outTpl;
 algorithm
-  (outExp, outTpl) := Expression.traverseExpTopDown(inExp, detectEqPatitionExp1, inTpl);
-end detectEqPatitionExp;
+  (outExp, outTpl) := Expression.traverseExpTopDown(inExp, detectEqPartitionExp1, inTpl);
+end detectEqPartitionExp;
 
-protected function detectEqPatitionExp1
+protected function detectEqPartitionExp1
   input DAE.Exp inExp;
   input tuple<Option<Boolean>, list<tuple<DAE.ComponentRef, Boolean>>, SourceInfo> inTpl;
   output DAE.Exp outExp = inExp;
@@ -1779,13 +1745,13 @@ algorithm
         DAE.CREF(cr, _) = e;
       then (partition, (cr, false)::refs, false);
     case DAE.CALL(path = path, expLst = exps)
-      then detectEqPatitionCall(path, exps, refs, partition, info);
+      then detectEqPartitionCall(path, exps, refs, partition, info);
     else (partition, refs, true);
   end match;
   outTpl := (partition, refs, info);
-end detectEqPatitionExp1;
+end detectEqPartitionExp1;
 
-protected function detectEqPatitionCall
+protected function detectEqPartitionCall
   input Absyn.Path inPath;
   input list<DAE.Exp> inExps;
   input list<tuple<DAE.ComponentRef, Boolean>> inRefs;
@@ -1799,24 +1765,24 @@ algorithm
     local
       DAE.Exp e, e1, e2;
     case (Absyn.IDENT("hold"), {e})
-      then detectEqPatitionCall1(false, true, inPartition, e, inRefs, info);
+      then detectEqPartitionCall1(false, true, inPartition, e, inRefs, info);
     case (Absyn.IDENT("sample"), {e, e1})
-      then detectEqPatitionCall1(true, false, inPartition, e, inRefs, info);
+      then detectEqPartitionCall1(true, false, inPartition, e, inRefs, info);
     case (Absyn.IDENT("subSample"), {e, e1})
-      then detectEqPatitionCall1(true, true, inPartition, e, inRefs, info);
+      then detectEqPartitionCall1(true, true, inPartition, e, inRefs, info);
     case (Absyn.IDENT("superSample"), {e, e1})
-      then detectEqPatitionCall1(true, true, inPartition, e, inRefs, info);
+      then detectEqPartitionCall1(true, true, inPartition, e, inRefs, info);
     case (Absyn.IDENT("shiftSample"), {e, e1, e2})
-      then detectEqPatitionCall1(true, true, inPartition, e, inRefs, info);
+      then detectEqPartitionCall1(true, true, inPartition, e, inRefs, info);
     case (Absyn.IDENT("backSample"), {e, e1, e2})
-      then detectEqPatitionCall1(true, true, inPartition, e, inRefs, info);
+      then detectEqPartitionCall1(true, true, inPartition, e, inRefs, info);
     case (Absyn.IDENT("noClock"), {e})
-      then detectEqPatitionCall1(true, true, inPartition, e, inRefs, info);
+      then detectEqPartitionCall1(true, true, inPartition, e, inRefs, info);
     else (inPartition, inRefs, true);
   end match;
-end detectEqPatitionCall;
+end detectEqPartitionCall;
 
-protected function detectEqPatitionCall1
+protected function detectEqPartitionCall1
   input Boolean expClocked;
   input Boolean refClocked;
   input Option<Boolean> inPartition;
@@ -1835,10 +1801,10 @@ algorithm
       then (setClockedPartition(SOME(expClocked), inPartition, NONE(), info), (cr, refClocked)::inRefs);
     else
       equation
-        print("Internal error -- Function SynchronousFeatures.detectEqPatitionCall1 failed\n");
+        print("Internal error -- Function SynchronousFeatures.detectEqPartitionCall1 failed\n");
       then fail();
   end match;
-end detectEqPatitionCall1;
+end detectEqPartitionCall1;
 
 protected function setSystPartition
   input BackendDAE.EqSystem inSyst;
@@ -1909,7 +1875,7 @@ algorithm
   end for;
 end partitionIndependentBlocks0;
 
-public function partitionIndependentBlocksMasked
+protected function partitionIndependentBlocksMasked
   input BackendDAE.IncidenceMatrix m;
   input BackendDAE.IncidenceMatrixT mT;
   input BackendDAE.IncidenceMatrix rm;

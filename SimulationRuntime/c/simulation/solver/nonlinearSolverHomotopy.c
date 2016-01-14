@@ -36,12 +36,14 @@
 #include <stdlib.h>
 #include <string.h> /* memcpy */
 
-#include "simulation/simulation_info_xml.h"
+#include "simulation/simulation_info_json.h"
 #include "util/omc_error.h"
 #include "util/varinfo.h"
 #include "model_help.h"
 #include "meta/meta_modelica.h"
+#if !defined(OMC_MINIMAL_RUNTIME)
 #include "util/write_csv.h"
+#endif
 
 #include "nonlinearSystem.h"
 #include "nonlinearSolverHomotopy.h"
@@ -274,7 +276,7 @@ void printUnknowns(int logName, DATA_HOMOTOPY *solverData)
 
   for(i=0; i<solverData->n; i++)
     infoStreamPrint(logName, 0, "[%2ld] %30s  = %16.8g\t\t nom = %16.8g\t\t min = %16.8g\t\t max = %16.8g", i+1,
-                    modelInfoGetEquation(&data->modelData.modelDataXml,eqSystemNumber).vars[i],
+                    modelInfoGetEquation(&data->modelData->modelDataXml,eqSystemNumber).vars[i],
                     solverData->x[i], solverData->xScaling[i], solverData->minValue[i], solverData->maxValue[i]);
   messageClose(logName);
 }
@@ -292,7 +294,7 @@ void printNewtonStep(int logName, DATA_HOMOTOPY *solverData)
 
   for(i=0; i<solverData->n; i++)
     infoStreamPrint(logName, 0, "[%2ld] %30s  = %16.8g\t\t step = %16.8g\t\t old = %16.8g", i+1,
-                    modelInfoGetEquation(&data->modelData.modelDataXml,eqSystemNumber).vars[i],
+                    modelInfoGetEquation(&data->modelData->modelDataXml,eqSystemNumber).vars[i],
                     solverData->x1[i], solverData->dy0[i], solverData->x[i]);
   messageClose(logName);
 }
@@ -310,7 +312,7 @@ void printHomotopyUnknowns(int logName, DATA_HOMOTOPY *solverData)
 
   for(i=0; i<solverData->n; i++)
     infoStreamPrint(logName, 0, "[%2ld] %30s  = %16.8g\t\t nom = %16.8g\t\t min = %16.8g\t\t max = %16.8g", i+1,
-                    modelInfoGetEquation(&data->modelData.modelDataXml,eqSystemNumber).vars[i],
+                    modelInfoGetEquation(&data->modelData->modelDataXml,eqSystemNumber).vars[i],
                     solverData->y0[i], solverData->xScaling[i], solverData->minValue[i], solverData->maxValue[i]);
   infoStreamPrint(logName, 0, "[%2ld] %30s  = %16.8g\t\t nom = %16.8g", i+1,
                   "LAMBDA",
@@ -331,7 +333,7 @@ void printHomotopyPredictorStep(int logName, DATA_HOMOTOPY *solverData)
 
   for(i=0; i<solverData->n; i++)
     infoStreamPrint(logName, 0, "[%2ld] %30s  = %16.8g\t\t dy = %16.8g\t\t old = %16.8g\t\t tau = %16.8g", i+1,
-                    modelInfoGetEquation(&data->modelData.modelDataXml,eqSystemNumber).vars[i],
+                    modelInfoGetEquation(&data->modelData->modelDataXml,eqSystemNumber).vars[i],
                     solverData->yt[i], solverData->dy0[i], solverData->y0[i], solverData->tau);
   infoStreamPrint(logName, 0, "[%2ld] %30s  = %16.8g\t\t dy = %16.8g\t\t old = %16.8g\t\t tau = %16.8g", i+1,
                   "LAMBDA",
@@ -352,7 +354,7 @@ void printHomotopyCorrectorStep(int logName, DATA_HOMOTOPY *solverData)
 
   for(i=0; i<solverData->n; i++)
     infoStreamPrint(logName, 0, "[%2ld] %30s  = %16.8g\t\t dy = %16.8g\t\t old = %16.8g\t\t tau = %16.8g", i+1,
-                    modelInfoGetEquation(&data->modelData.modelDataXml,eqSystemNumber).vars[i],
+                    modelInfoGetEquation(&data->modelData->modelDataXml,eqSystemNumber).vars[i],
                     solverData->y1[i], solverData->dy1[i], solverData->yt[i], solverData->tau);
   infoStreamPrint(logName, 0, "[%2ld] %30s  = %16.8g\t\t dy = %16.8g\t\t old = %16.8g\t\t tau = %16.8g", i+1,
                   "LAMBDA",
@@ -366,24 +368,30 @@ void debugMatrixPermutedDouble(int logName, char* matrixName, double* matrix, in
   {
     int i, j;
     int sparsity = 0;
-    char buffer[4096];
+    char *buffer = (char*)malloc(sizeof(char)*m*20);
 
     infoStreamPrint(logName, 1, "%s [%dx%d-dim]", matrixName, n, m);
     for(i=0; i<n;i++)
     {
       buffer[0] = 0;
       for(j=0; j<m; j++)
-        if (sparsity) {
+      {
+        if (sparsity)
+        {
           if (fabs(matrix[indRow[i] + indCol[j]*(m-1)])<1e-12)
             sprintf(buffer, "%s 0", buffer);
           else
             sprintf(buffer, "%s *", buffer);
-        } else {
+        }
+        else
+        {
           sprintf(buffer, "%s%16.8g ", buffer, matrix[indRow[i] + indCol[j]*(m-1)]);
         }
+      }
       infoStreamPrint(logName, 0, "%s", buffer);
     }
     messageClose(logName);
+    free(buffer);
   }
 }
 
@@ -393,33 +401,39 @@ void debugMatrixDouble(int logName, char* matrixName, double* matrix, int n, int
   {
     int i, j;
     int sparsity = 0;
-    char buffer[4096];
+    char *buffer = (char*)malloc(sizeof(char)*m*20);
 
     infoStreamPrint(logName, 1, "%s [%dx%d-dim]", matrixName, n, m);
     for(i=0; i<n;i++)
     {
       buffer[0] = 0;
       for(j=0; j<m; j++)
-        if (sparsity) {
+      {
+        if (sparsity)
+        {
           if (fabs(matrix[i + j*(m-1)])<1e-12)
             sprintf(buffer, "%s 0", buffer);
           else
             sprintf(buffer, "%s *", buffer);
-        } else {
+        }
+        else
+        {
           sprintf(buffer, "%s%16.8g ", buffer, matrix[i + j*(m-1)]);
         }
+      }
       infoStreamPrint(logName, 0, "%s", buffer);
     }
     messageClose(logName);
+    free(buffer);
   }
 }
 
 void debugVectorDouble(int logName, char* vectorName, double* vector, int n)
 {
-   if(ACTIVE_STREAM(logName))
+  if(ACTIVE_STREAM(logName))
   {
     int i;
-    char buffer[4096];
+    char *buffer = (char*)malloc(sizeof(char)*n*20);
 
     infoStreamPrint(logName, 1, "%s [%d-dim]", vectorName, n);
     buffer[0] = 0;
@@ -434,6 +448,7 @@ void debugVectorDouble(int logName, char* vectorName, double* vector, int n)
     }
     infoStreamPrint(logName, 0, "%s", buffer);
     messageClose(logName);
+    free(buffer);
   }
 }
 
@@ -442,7 +457,7 @@ void debugVectorInt(int logName, char* vectorName, modelica_boolean* vector, int
    if(ACTIVE_STREAM(logName))
   {
     int i;
-    char buffer[4096];
+    char *buffer = (char*)malloc(sizeof(char)*n*20);
 
     infoStreamPrint(logName, 1, "%s [%d-dim]", vectorName, n);
     buffer[0] = 0;
@@ -457,6 +472,7 @@ void debugVectorInt(int logName, char* vectorName, modelica_boolean* vector, int
     }
     infoStreamPrint(logName, 0, "%s", buffer);
     messageClose(logName);
+    free(buffer);
   }
 }
 
@@ -728,40 +744,40 @@ int getAnalyticalJacobianHomotopy(DATA_HOMOTOPY* solverData, double* jac)
   DATA* data = solverData->data;
   threadData_t *threadData = solverData->threadData;
   int i,j,k,l,ii;
-  NONLINEAR_SYSTEM_DATA* systemData = &(data->simulationInfo.nonlinearSystemData[solverData->sysNumber]);
+  NONLINEAR_SYSTEM_DATA* systemData = &(data->simulationInfo->nonlinearSystemData[solverData->sysNumber]);
   const int index = systemData->jacobianIndex;
 
   memset(jac, 0, (solverData->n)*(solverData->n)*sizeof(double));
 
-  for(i=0; i < data->simulationInfo.analyticJacobians[index].sparsePattern.maxColors; i++)
+  for(i=0; i < data->simulationInfo->analyticJacobians[index].sparsePattern.maxColors; i++)
   {
     /* activate seed variable for the corresponding color */
-    for(ii=0; ii < data->simulationInfo.analyticJacobians[index].sizeCols; ii++)
-      if(data->simulationInfo.analyticJacobians[index].sparsePattern.colorCols[ii]-1 == i)
-        data->simulationInfo.analyticJacobians[index].seedVars[ii] = 1;
+    for(ii=0; ii < data->simulationInfo->analyticJacobians[index].sizeCols; ii++)
+      if(data->simulationInfo->analyticJacobians[index].sparsePattern.colorCols[ii]-1 == i)
+        data->simulationInfo->analyticJacobians[index].seedVars[ii] = 1;
 
     ((systemData->analyticalJacobianColumn))(data, threadData);
 
-    for(j = 0; j < data->simulationInfo.analyticJacobians[index].sizeCols; j++)
+    for(j = 0; j < data->simulationInfo->analyticJacobians[index].sizeCols; j++)
     {
-      if(data->simulationInfo.analyticJacobians[index].seedVars[j] == 1)
+      if(data->simulationInfo->analyticJacobians[index].seedVars[j] == 1)
       {
         if(j==0)
           ii = 0;
         else
-          ii = data->simulationInfo.analyticJacobians[index].sparsePattern.leadindex[j-1];
-        while(ii < data->simulationInfo.analyticJacobians[index].sparsePattern.leadindex[j])
+          ii = data->simulationInfo->analyticJacobians[index].sparsePattern.leadindex[j-1];
+        while(ii < data->simulationInfo->analyticJacobians[index].sparsePattern.leadindex[j])
         {
-          l  = data->simulationInfo.analyticJacobians[index].sparsePattern.index[ii];
-          k  = j*data->simulationInfo.analyticJacobians[index].sizeRows + l;
+          l  = data->simulationInfo->analyticJacobians[index].sparsePattern.index[ii];
+          k  = j*data->simulationInfo->analyticJacobians[index].sizeRows + l;
           /* Calculate scaled difference quotient */
-          jac[k] = data->simulationInfo.analyticJacobians[index].resultVars[l] * solverData->xScaling[j];
+          jac[k] = data->simulationInfo->analyticJacobians[index].resultVars[l] * solverData->xScaling[j];
           ii++;
         };
       }
       /* de-activate seed variable for the corresponding color */
-      if(data->simulationInfo.analyticJacobians[index].sparsePattern.colorCols[j]-1 == i)
-        data->simulationInfo.analyticJacobians[index].seedVars[j] = 0;
+      if(data->simulationInfo->analyticJacobians[index].sparsePattern.colorCols[j]-1 == i)
+        data->simulationInfo->analyticJacobians[index].seedVars[j] = 0;
     }
   }
 
@@ -780,7 +796,6 @@ static int getNumericalJacobianHomotopy(DATA_HOMOTOPY* solverData, double *x, do
   const double delta_h = sqrt(DBL_EPSILON*2e1);
   double delta_hh;
   double xsave;
-
   int i,j,l;
 
   /* solverData->f1 must be set outside this function based on x */
@@ -816,7 +831,7 @@ static int wrapper_fvec(DATA_HOMOTOPY* solverData, double* x, double* f)
   int iflag = 0;
 
   /*TODO: change input to residualFunc from data to systemData */
-  (solverData->data)->simulationInfo.nonlinearSystemData[solverData->sysNumber].residualFunc(dataAndThreadData, x, f, &iflag);
+  (solverData->data)->simulationInfo->nonlinearSystemData[solverData->sysNumber].residualFunc(dataAndThreadData, x, f, &iflag);
   solverData->numberOfFunctionEvaluations++;
 
   return 0;
@@ -831,7 +846,7 @@ static int wrapper_fvec(DATA_HOMOTOPY* solverData, double* x, double* f)
 static int wrapper_fvec_der(DATA_HOMOTOPY* solverData, double* x, double* fJac)
 {
   int i;
-  int jacobianIndex = (&(solverData->data->simulationInfo.nonlinearSystemData[solverData->sysNumber]))->jacobianIndex;
+  int jacobianIndex = (&(solverData->data->simulationInfo->nonlinearSystemData[solverData->sysNumber]))->jacobianIndex;
 
   /* calculate jacobian */
   if(jacobianIndex != -1)
@@ -1098,7 +1113,7 @@ static int newtonAlgorithm(DATA_HOMOTOPY* solverData, double* x)
 
   int assert = 1;
   threadData_t *threadData = solverData->threadData;
-  NONLINEAR_SYSTEM_DATA* nonlinsys = &(solverData->data->simulationInfo.nonlinearSystemData[solverData->data->simulationInfo.currentNonlinearSystemIndex]);
+  NONLINEAR_SYSTEM_DATA* nonlinsys = &(solverData->data->simulationInfo->nonlinearSystemData[solverData->data->simulationInfo->currentNonlinearSystemIndex]);
 
   /* debug information */
   debugString(LOG_NLS_V, "******************************************************");
@@ -1255,6 +1270,7 @@ static int newtonAlgorithm(DATA_HOMOTOPY* solverData, double* x)
     vecDivScaling(solverData->n, solverData->f1, solverData->resScaling, solverData->fvecScaled);
     debugVectorDouble(LOG_NLS_V,"function values:",solverData->f1, n);
     debugVectorDouble(LOG_NLS_V,"scaled function values:",solverData->fvecScaled, n);
+
     vecDivScaling(solverData->n, solverData->dy0, solverData->xScaling, solverData->dxScaled);
     delta_x        = vecNorm2(solverData->n, solverData->dy0);
     delta_x_scaled = vecNorm2(solverData->n, solverData->dxScaled);
@@ -1274,7 +1290,8 @@ static int newtonAlgorithm(DATA_HOMOTOPY* solverData, double* x)
     countNegativeSteps += (error_f > 10*error_f_old);
     error_f_old = error_f;
 
-    if (solverData->data->simulationInfo.nlsCsvInfomation){
+#if !defined(OMC_MINIMAL_RUNTIME)
+    if (solverData->data->simulationInfo->nlsCsvInfomation){
       print_csvLineIterStats(((struct csvStats*) nonlinsys->csvData)->iterStats,
                              nonlinsys->size,
                              nonlinsys->numberOfCall+1,
@@ -1288,7 +1305,7 @@ static int newtonAlgorithm(DATA_HOMOTOPY* solverData, double* x)
                              lambda
       );
     }
-
+#endif
     if ((error_f_scaled < 1e-30*error_f) || countNegativeSteps > 20)
     {
       debugInt(LOG_NLS_V,"UPS! Something happened, NegativeSteps = ", countNegativeSteps);
@@ -1339,7 +1356,7 @@ static int newtonAlgorithm(DATA_HOMOTOPY* solverData, double* x)
         debugString(LOG_NLS_V, "NEWTON SOLVER DID CONVERGE TO A SOLUTION WITH LESS ACCURACY!!!");
         printUnknowns(LOG_NLS_V, solverData);
         debugString(LOG_NLS_V, "******************************************************");
-        solverData->error_f = error_f;
+        solverData->error_f = 0;
 
       } else
       {
@@ -1353,12 +1370,11 @@ static int newtonAlgorithm(DATA_HOMOTOPY* solverData, double* x)
       solverData->numberOfIterations += numberOfIterations;
       break;
     }
-
     assert = 1;
 #ifndef OMC_EMCC
     MMC_TRY_INTERNAL(simulationJumpBuffer)
 #endif
-    /* calculate jacobian and function values (both stored in fJac, last column is fvec)*/
+    /* calculate jacobian and function values (both stored in fJac, last column is fvec) */
     solverData->fJac_f(solverData, x, solverData->fJac);
     assert = 0;
 #ifndef OMC_EMCC
@@ -1672,7 +1688,7 @@ static int homotopyAlgorithm(DATA_HOMOTOPY* solverData, double *x)
  */
 int solveHomotopy(DATA *data, threadData_t *threadData, int sysNumber)
 {
-  NONLINEAR_SYSTEM_DATA* systemData = &(data->simulationInfo.nonlinearSystemData[sysNumber]);
+  NONLINEAR_SYSTEM_DATA* systemData = &(data->simulationInfo->nonlinearSystemData[sysNumber]);
   DATA_HOMOTOPY* solverData = (DATA_HOMOTOPY*)(systemData->solverData);
   DATA_HYBRD* solverDataHybrid;
 
@@ -1707,7 +1723,7 @@ int solveHomotopy(DATA *data, threadData_t *threadData, int sysNumber)
   int casualTearingSet = systemData->strictTearingFunctionCall != NULL;
 
   modelica_boolean* relationsPreBackup;
-  relationsPreBackup = (modelica_boolean*) malloc(data->modelData.nRelations*sizeof(modelica_boolean));
+  relationsPreBackup = (modelica_boolean*) malloc(data->modelData->nRelations*sizeof(modelica_boolean));
 
   solverData->f = wrapper_fvec;
   solverData->fJac_f = wrapper_fvec_der;
@@ -1730,7 +1746,7 @@ int solveHomotopy(DATA *data, threadData_t *threadData, int sysNumber)
   debugInt(LOG_NLS_V,   "number of function calls (so far!): ",numberOfFunctionEvaluationsOld);
 
   /* set x vector */
-  if(data->simulationInfo.discreteCall)
+  if(data->simulationInfo->discreteCall)
   {
     vecCopy(solverData->n, systemData->nlsx, solverData->xStart);
     debugVectorDouble(LOG_NLS_V,"System values", solverData->xStart, solverData->n);
@@ -1757,44 +1773,51 @@ int solveHomotopy(DATA *data, threadData_t *threadData, int sysNumber)
   {
     debugVectorDouble(LOG_NLS_V,"x0", solverData->x0, solverData->n);
     /* evaluate with discontinuities */
-    if(data->simulationInfo.discreteCall)
+    if(data->simulationInfo->discreteCall)
     {
-      ((DATA*)data)->simulationInfo.solveContinuous = 0;
+      ((DATA*)data)->simulationInfo->solveContinuous = 0;
     }
     /* evaluate with discontinuities */
  #ifndef OMC_EMCC
     MMC_TRY_INTERNAL(simulationJumpBuffer)
  #endif
+    if (mixedSystem)
+      memcpy(relationsPreBackup, data->simulationInfo->relations, sizeof(modelica_boolean)*data->modelData->nRelations);
+
     solverData->f(solverData, solverData->x0, solverData->f1);
     /* Try to get out of here!!! */
     error_f        = vecNorm2(solverData->n, solverData->f1);
     if ((error_f - solverData->error_f)<=0)
     {
-      success = 1;
-      /* debug information */
-      debugString(LOG_NLS_V, "NO ITERATION NECESSARY!!!");
-      debugString(LOG_NLS_V, "******************************************************");
-      debugString(LOG_NLS_V,"SYSTEM SOLVED");
-      debugInt(LOG_NLS_V,   "number of function calls: ",solverData->numberOfFunctionEvaluations-numberOfFunctionEvaluationsOld);
-      debugString(LOG_NLS_V, "------------------------------------------------------");
-        /* take the solution */
-      vecCopy(solverData->n, solverData->x0, systemData->nlsx);
-      debugVectorDouble(LOG_NLS_V,"Solution", solverData->x0, solverData->n);
-      /* reset continous flag */
-      ((DATA*)data)->simulationInfo.solveContinuous = 0;
+      //infoStreamPrint(LOG_STDOUT, 0, "No Iteration at time %g needed new f = %g  and old f1 = %g", solverData->timeValue, error_f, solverData->error_f);
+      if (mixedSystem && data->simulationInfo->discreteCall && isNotEqualVectorInt(((DATA*)data)->modelData->nRelations, ((DATA*)data)->simulationInfo->relations, relationsPreBackup)){}
+      else
+      {
+        success = 1;
 
-      free(relationsPreBackup);
+        debugString(LOG_NLS_V, "NO ITERATION NECESSARY!!!");
+        debugString(LOG_NLS_V, "******************************************************");
+        debugString(LOG_NLS_V,"SYSTEM SOLVED");
+        debugInt(LOG_NLS_V,   "number of function calls: ",solverData->numberOfFunctionEvaluations-numberOfFunctionEvaluationsOld);
+        debugString(LOG_NLS_V, "------------------------------------------------------");
 
-      /* write statistics */
-      systemData->numberOfFEval = solverData->numberOfFunctionEvaluations;
+        vecCopy(solverData->n, solverData->x0, systemData->nlsx);
+        debugVectorDouble(LOG_NLS_V,"Solution", solverData->x0, solverData->n);
 
-      return success;
+        ((DATA*)data)->simulationInfo->solveContinuous = 0;
+
+        free(relationsPreBackup);
+
+        systemData->numberOfFEval = solverData->numberOfFunctionEvaluations;
+
+        return success;
+      }
     }
     solverData->fJac_f(solverData, solverData->x0, solverData->fJac);
     vecCopy(solverData->n, solverData->f1, solverData->fJac + solverData->n*solverData->n);
     vecCopy(solverData->n*solverData->m, solverData->fJac, solverData->fJacx0);
     if (mixedSystem)
-      memcpy(relationsPreBackup, data->simulationInfo.relations, sizeof(modelica_boolean)*data->modelData.nRelations);
+      memcpy(relationsPreBackup, data->simulationInfo->relations, sizeof(modelica_boolean)*data->modelData->nRelations);
     /* calculate scaling factor of residuals */
     matVecMultAbsBB(solverData->n, solverData->fJac, solverData->ones, solverData->resScaling);
     debugVectorDouble(LOG_NLS_JAC, "residuum scaling:", solverData->resScaling, solverData->n);
@@ -1834,7 +1857,7 @@ int solveHomotopy(DATA *data, threadData_t *threadData, int sysNumber)
         solverData->x0[i] = solverData->xStart[i] + solverData->xScaling[i]*i/solverData->n*0.1;
     }
   }
-  ((DATA*)data)->simulationInfo.solveContinuous = 1;
+  ((DATA*)data)->simulationInfo->solveContinuous = 1;
   vecCopy(solverData->n, solverData->x0, solverData->x);
   vecCopy(solverData->n, solverData->f1, solverData->fx0);
   /* start solving loop */
@@ -1847,7 +1870,7 @@ int solveHomotopy(DATA *data, threadData_t *threadData, int sysNumber)
     if (!skipNewton){
 
       /* set x vector */
-      if(data->simulationInfo.discreteCall){
+      if(data->simulationInfo->discreteCall){
         memcpy(systemData->nlsx, solverData->x, solverData->n*(sizeof(double)));
       }
       else{
@@ -1878,14 +1901,14 @@ int solveHomotopy(DATA *data, threadData_t *threadData, int sysNumber)
     {
       success = 1;
       /* This case may be switched off, because of event chattering!!!*/
-      if(mixedSystem && data->simulationInfo.discreteCall && (alreadyTested<1))
+      if(mixedSystem && data->simulationInfo->discreteCall && (alreadyTested<1))
       {
-        debugVectorInt(LOG_NLS_V,"Relations Pre vector ", ((DATA*)data)->simulationInfo.relationsPre, ((DATA*)data)->modelData.nRelations);
-        debugVectorInt(LOG_NLS_V,"Relations Backup vector ", relationsPreBackup, ((DATA*)data)->modelData.nRelations);
-        ((DATA*)data)->simulationInfo.solveContinuous = 0;
+        debugVectorInt(LOG_NLS_V,"Relations Pre vector ", ((DATA*)data)->simulationInfo->relationsPre, ((DATA*)data)->modelData->nRelations);
+        debugVectorInt(LOG_NLS_V,"Relations Backup vector ", relationsPreBackup, ((DATA*)data)->modelData->nRelations);
+        ((DATA*)data)->simulationInfo->solveContinuous = 0;
         solverData->f(solverData, solverData->x, solverData->f1);
-        debugVectorInt(LOG_NLS_V,"Relations vector ", ((DATA*)data)->simulationInfo.relations, ((DATA*)data)->modelData.nRelations);
-        if (isNotEqualVectorInt(((DATA*)data)->modelData.nRelations, ((DATA*)data)->simulationInfo.relations, relationsPreBackup)>0)
+        debugVectorInt(LOG_NLS_V,"Relations vector ", ((DATA*)data)->simulationInfo->relations, ((DATA*)data)->modelData->nRelations);
+        if (isNotEqualVectorInt(((DATA*)data)->modelData->nRelations, ((DATA*)data)->simulationInfo->relations, relationsPreBackup)>0)
         {
           /* re-run the solution process, since relations in the system have changed */
           success = 0;
@@ -1917,7 +1940,7 @@ int solveHomotopy(DATA *data, threadData_t *threadData, int sysNumber)
         vecCopy(solverData->n, solverData->x, systemData->nlsx);
         debugVectorDouble(LOG_NLS_V,"Solution", solverData->x, solverData->n);
         /* reset continous flag */
-        ((DATA*)data)->simulationInfo.solveContinuous = 0;
+        ((DATA*)data)->simulationInfo->solveContinuous = 0;
         break;
       }
     }

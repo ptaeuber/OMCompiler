@@ -57,6 +57,7 @@ public constant String UNIQUEIO = "$unique$outer$";
 
 public constant String derivativeNamePrefix = "$DER";
 public constant String preNamePrefix = "$PRE";
+public constant String previousNamePrefix = "$CLKPRE";
 public constant String startNamePrefix = "$START";
 
 
@@ -464,7 +465,6 @@ uniontype VariableAttributes
     Option<Exp> startOrigin "where did start=X came from? NONE()|SOME(DAE.SCONST binding|type|undefined)";
   end VAR_ATTR_BOOL;
 
-  // BTH
   record VAR_ATTR_CLOCK
     Option<Boolean> isProtected;
     Option<Boolean> finalPrefix;
@@ -1197,12 +1197,10 @@ uniontype EqMod "To generate the correct set of equations, the translator has to
     Option<Values.Value> modifierAsValue "modifier as Value option" ;
     Properties properties "properties" ;
     Absyn.Exp modifierAsAbsynExp "keep the untyped modifier as an absyn expression for modification comparison";
-    SourceInfo info;
   end TYPED;
 
   record UNTYPED
     Absyn.Exp exp;
-    SourceInfo info;
   end UNTYPED;
 
 end EqMod;
@@ -1221,21 +1219,20 @@ uniontype Mod "Modification"
     SCode.Final   finalPrefix "final prefix";
     SCode.Each    eachPrefix "each prefix";
     list<SubMod>  subModLst;
-    Option<EqMod> eqModOption;
+    Option<EqMod> binding;
+    SourceInfo    info;
   end MOD;
 
   record REDECL
     SCode.Final finalPrefix "final prefix";
     SCode.Each  eachPrefix "each prefix";
-    list<tuple<SCode.Element, Mod>> tplSCodeElementModLst;
+    SCode.Element element;
+    Mod mod;
   end REDECL;
 
   record NOMOD end NOMOD;
-
 end Mod;
 
-
-// BTH
 public
 uniontype ClockKind
   record INFERRED_CLOCK
@@ -1293,7 +1290,6 @@ uniontype Exp "Expressions
     Boolean bool "Bool constants" ;
   end BCONST;
 
-  // BTH
   record CLKCONST
     ClockKind clk "Clock constants" ;
   end CLKCONST;

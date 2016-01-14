@@ -33,16 +33,29 @@ extern "C" void BOOST_EXTENSION_EXPORT_DECL extension_export_ida(boost::extensio
 #elif defined(OMC_BUILD) && defined(RUNTIME_STATIC_LINKING)
 #include <Solver/IDA/IDA.h>
 #include <Solver/IDA/IDASettings.h>
-    boost::shared_ptr<ISolver> createIda(IMixedSystem* system, boost::shared_ptr<ISolverSettings> solver_settings)
+
+  #ifdef ENABLE_SUNDIALS_STATIC
+    shared_ptr<ISolver> createIda(IMixedSystem* system, shared_ptr<ISolverSettings> solver_settings)
     {
-        boost::shared_ptr<ISolver> ida = boost::shared_ptr<ISolver>(new Ida(system,solver_settings));
+        shared_ptr<ISolver> ida = shared_ptr<ISolver>(new Ida(system,solver_settings.get()));
         return ida;
     }
-    boost::shared_ptr<ISolverSettings> createIdaSettings(boost::shared_ptr<IGlobalSettings> globalSettings)
+    shared_ptr<ISolverSettings> createIdaSettings(shared_ptr<IGlobalSettings> globalSettings)
     {
-         boost::shared_ptr<ISolverSettings> ida_settings = boost::shared_ptr<ISolverSettings>(new IDASettings(globalSettings));
+         shared_ptr<ISolverSettings> ida_settings = shared_ptr<ISolverSettings>(new IDASettings(globalSettings.get()));
          return ida_settings;
     }
+  #else
+    shared_ptr<ISolver> createIda(IMixedSystem* system, shared_ptr<ISolverSettings> solver_settings)
+    {
+      throw ModelicaSimulationError(SOLVER,"IDA was disabled during build");
+    }
+    shared_ptr<ISolverSettings> createIdaSettings(shared_ptr<IGlobalSettings> globalSettings)
+    {
+      throw ModelicaSimulationError(SOLVER,"IDA was disabled during build");
+    }
+  #endif //ENABLE_SUNDIALS_STATIC
+
 
 #else
 error "operating system not supported"

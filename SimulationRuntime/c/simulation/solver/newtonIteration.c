@@ -39,7 +39,7 @@ extern "C" {
 #include <stdlib.h>
 #include <string.h> /* memcpy */
 
-#include "simulation/simulation_info_xml.h"
+#include "simulation/simulation_info_json.h"
 #include "util/omc_error.h"
 #include "util/varinfo.h"
 #include "model_help.h"
@@ -240,7 +240,7 @@ int _omc_newton(int(*f)(int*, double*, double*, void*, int), DATA_NEWTON* solver
     /* debug output */
     if(ACTIVE_STREAM(LOG_NLS_JAC))
     {
-      char buffer[4096];
+      char *buffer = (char*)malloc(sizeof(char)*solverData->n*15);
 
       infoStreamPrint(LOG_NLS_JAC, 1, "jacobian matrix [%dx%d]", (int)*n, (int)*n);
       for(i=0; i<solverData->n;i++)
@@ -251,6 +251,7 @@ int _omc_newton(int(*f)(int*, double*, double*, void*, int), DATA_NEWTON* solver
         infoStreamPrint(LOG_NLS_JAC, 0, "%s", buffer);
       }
       messageClose(LOG_NLS_JAC);
+      free(buffer);
     }
 
     if (solveLinearSystem(n, iwork, fvec, fjac, solverData) != 0)

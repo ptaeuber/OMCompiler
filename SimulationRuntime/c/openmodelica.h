@@ -164,11 +164,11 @@ struct type_desc_s {
 #endif
 
 /* initial and terminal function calls */
-#define initial() data->simulationInfo.initial
-#define terminal() data->simulationInfo.terminal
+#define initial() data->simulationInfo->initial
+#define terminal() data->simulationInfo->terminal
 
-#define homotopy(actual, simplified) ((simplified) * (1.0-data->simulationInfo.lambda) + (actual) * data->simulationInfo.lambda)
-#define homotopyParameter() data->simulationInfo.lambda
+#define homotopy(actual, simplified) ((simplified) * (1.0-data->simulationInfo->lambda) + (actual) * data->simulationInfo->lambda)
+#define homotopyParameter() data->simulationInfo->lambda
 
 typedef struct {
   void (*init)(void);
@@ -177,6 +177,10 @@ typedef struct {
   char* (*malloc_string)(size_t);
   char* (*malloc_strdup)(const char*);
   int (*collect_a_little)(void);
+  void* (*malloc_uncollectable)(size_t);
+  void (*free_uncollectable)(void*);
+  void* (*malloc_string_persist)(size_t);
+  void (*free_string_persist)(void*);
 } omc_alloc_interface_t;
 
 extern omc_alloc_interface_t omc_alloc_interface;

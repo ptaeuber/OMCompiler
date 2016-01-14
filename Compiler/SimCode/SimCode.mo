@@ -77,6 +77,8 @@ type JacobianMatrix = tuple<list<JacobianColumn>,                         // col
 
 public constant list<DAE.Exp> listExpLength1 = {DAE.ICONST(0)} "For CodegenC.tpl";
 public constant list<Variable> boxedRecordOutVars = VARIABLE(DAE.CREF_IDENT("",DAE.T_COMPLEX_DEFAULT_RECORD,{}),DAE.T_COMPLEX_DEFAULT_RECORD,NONE(),{},DAE.NON_PARALLEL(),DAE.VARIABLE())::{} "For CodegenC.tpl";
+constant PartitionData emptyPartitionData = PARTITIONDATA(-1,{},{},{});
+
 
 uniontype SimCode
   "Root data structure containing information required for templates to
@@ -92,6 +94,7 @@ uniontype SimCode
     list<ClockedPartition> clockedPartitions;
     Boolean useHomotopy "true if homotopy(...) is used during initialization";
     list<SimEqSystem> initialEquations;
+    list<SimEqSystem> initialEquations_lambda0;
     list<SimEqSystem> removedInitialEquations;
     list<SimEqSystem> startValueEquations;
     list<SimEqSystem> nominalValueEquations;
@@ -123,9 +126,11 @@ uniontype SimCode
     //*** a protected section *** not exported to SimCodeTV
     HashTableCrILst.HashTable varToIndexMapping;
     HashTableCrefToSimVar crefToSimVarHT "hidden from typeview - used by cref2simvar() for cref -> SIMVAR lookup available in templates.";
+    HashTable.HashTable crefToClockIndexHT "map variables to clock indices";
     Option<BackendMapping> backendMapping;
     //FMI 2.0 data for model structure
     Option<FmiModelStructure> modelStructure;
+    PartitionData partitionData;
   end SIMCODE;
 end SimCode;
 
@@ -162,6 +167,15 @@ uniontype BackendMapping
   end NO_MAPPING;
 end BackendMapping;
 
+public uniontype PartitionData
+  record PARTITIONDATA
+    Integer numPartitions;
+    list<list<Integer>> partitions; // which equations are assigned to the partitions
+    list<list<Integer>> activatorsForPartitions; // which activators can activate each partition
+    list<Integer> stateToActivators; // which states belong to which activator
+  end PARTITIONDATA;
+end PartitionData;
+
 uniontype DelayedExpression
   "Delayed expressions type"
   record DELAYED_EXPRESSIONS
@@ -197,6 +211,7 @@ uniontype ModelInfo "Container for metadata about a Modelica model."
     Integer maxDer "the highest derivative in the model";
     Integer nClocks;
     Integer nSubClocks;
+    Boolean hasLargeLinearEquationSystems; // True if model has large linear eq. systems that are crucial for performance.
   end MODELINFO;
 end ModelInfo;
 
@@ -629,6 +644,12 @@ public uniontype FmiDerivatives
   end FMIDERIVATIVES;
 end FmiDerivatives;
 
+public uniontype FmiDiscreteStates
+  record FMIDISCRETESTATES
+    list<FmiUnknown> fmiUnknownsList;
+  end FMIDISCRETESTATES;
+end FmiDiscreteStates;
+
 public uniontype FmiInitialUnknowns
   record FMIINITIALUNKNOWNS
     list<FmiUnknown> fmiUnknownsList;
@@ -639,6 +660,7 @@ public uniontype FmiModelStructure
   record FMIMODELSTRUCTURE
     FmiOutputs fmiOutputs;
     FmiDerivatives fmiDerivatives;
+    FmiDiscreteStates fmiDiscreteStates;
     FmiInitialUnknowns fmiInitialUnknowns;
   end FMIMODELSTRUCTURE;
 end FmiModelStructure;

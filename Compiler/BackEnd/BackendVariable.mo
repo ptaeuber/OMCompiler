@@ -818,9 +818,12 @@ algorithm
       list<BackendDAE.VarKind> kind_lst;
 
     /* Real non discrete variable */
+    case (BackendDAE.VAR(varKind = BackendDAE.CLOCKED_STATE(_), varType = DAE.T_REAL(_,_)))
+      then true;
+
     case (BackendDAE.VAR(varKind = kind, varType = DAE.T_REAL(_,_))) equation
       kind_lst = {BackendDAE.VARIABLE(), BackendDAE.DUMMY_DER(), BackendDAE.DUMMY_STATE(), BackendDAE.OPT_INPUT_WITH_DER(), BackendDAE.OPT_INPUT_DER()};
-    then listMember(kind, kind_lst) or isOptLoopInput(kind);
+      then listMember(kind, kind_lst) or isOptLoopInput(kind);
 
     else false;
   end match;
@@ -847,7 +850,7 @@ algorithm
 
     /* Real discrete variable */
     case (BackendDAE.VAR(varKind = BackendDAE.DISCRETE(), varType = DAE.T_REAL(_,_)))
-    then true;
+      then true;
 
     else false;
   end match;
@@ -865,9 +868,12 @@ algorithm
       list<BackendDAE.VarKind> kind_lst;
 
     /* string variable */
+    case (BackendDAE.VAR(varKind = BackendDAE.CLOCKED_STATE(_), varType = DAE.T_STRING()))
+      then true;
+
     case (BackendDAE.VAR(varKind = kind, varType = DAE.T_STRING())) equation
       kind_lst = {BackendDAE.VARIABLE(), BackendDAE.DISCRETE(), BackendDAE.DUMMY_DER(), BackendDAE.DUMMY_STATE()};
-    then listMember(kind, kind_lst);
+      then listMember(kind, kind_lst);
 
     else false;
   end match;
@@ -883,6 +889,9 @@ algorithm
       BackendDAE.Type typeVar;
       list<BackendDAE.VarKind> kind_lst;
     /* int variable */
+    case (BackendDAE.VAR(varKind = BackendDAE.CLOCKED_STATE(_), varType = DAE.T_INTEGER()))
+      then true;
+
     case (BackendDAE.VAR(varKind = kind,
                      varType = DAE.T_INTEGER()))
       equation
@@ -913,12 +922,16 @@ algorithm
       BackendDAE.Type typeVar;
       list<BackendDAE.VarKind> kind_lst;
     /* int variable */
+    case (BackendDAE.VAR(varKind = BackendDAE.CLOCKED_STATE(_), varType = DAE.T_BOOL()))
+      then true;
+
     case (BackendDAE.VAR(varKind = kind,
                      varType = DAE.T_BOOL()))
       equation
         kind_lst = {BackendDAE.VARIABLE(), BackendDAE.DISCRETE(), BackendDAE.DUMMY_DER(),
                     BackendDAE.DUMMY_STATE()};
       then listMember(kind, kind_lst);
+
     else false;
   end matchcontinue;
 end isVarBoolAlg;
@@ -1501,7 +1514,7 @@ algorithm
 end createVar;
 
 public function createCSEVar "Creates a cse variable with the name of inCref.
-  TODO: discrete real varaibales are not treated correctly"
+  TODO: discrete real variables are not treated correctly"
   input DAE.ComponentRef inCref;
   input DAE.Type inType;
   output BackendDAE.Var outVar;
@@ -1517,15 +1530,43 @@ algorithm
       DAE.T_COMPLEX(complexClassType=ClassInf.RECORD(path), source=typeLst) = inType;
       source = DAE.SOURCE(Absyn.dummyInfo, {}, NONE(), {}, path::typeLst, {}, {});
       varKind = if Types.isDiscreteType(inType) then BackendDAE.DISCRETE() else BackendDAE.VARIABLE();
-      outVar = BackendDAE.VAR(inCref, varKind, DAE.BIDIR(), DAE.NON_PARALLEL(), inType, NONE(), NONE(), {}, source, NONE(), SOME(BackendDAE.AVOID()), NONE(), DAE.NON_CONNECTOR(), DAE.NOT_INNER_OUTER(), false);
+      outVar = BackendDAE.VAR(inCref, varKind, DAE.BIDIR(), DAE.NON_PARALLEL(), inType, NONE(), NONE(), {}, source, NONE(), NONE(), NONE(), DAE.NON_CONNECTOR(), DAE.NOT_INNER_OUTER(), true);
     then outVar;
 
-    case (_) equation
+    else equation
       varKind = if Types.isDiscreteType(inType) then BackendDAE.DISCRETE() else BackendDAE.VARIABLE();
-      outVar = BackendDAE.VAR(inCref, varKind, DAE.BIDIR(), DAE.NON_PARALLEL(), inType, NONE(), NONE(), {}, DAE.emptyElementSource, NONE(), SOME(BackendDAE.AVOID()), NONE(), DAE.NON_CONNECTOR(), DAE.NOT_INNER_OUTER(), false);
+      outVar = BackendDAE.VAR(inCref, varKind, DAE.BIDIR(), DAE.NON_PARALLEL(), inType, NONE(), NONE(), {}, DAE.emptyElementSource, NONE(), NONE(), NONE(), DAE.NON_CONNECTOR(), DAE.NOT_INNER_OUTER(), true);
     then outVar;
   end match;
 end createCSEVar;
+
+public function createCSEArrayVar "Creates a cse array variable with the name of inCref.
+  TODO: discrete real variables are not treated correctly"
+  input DAE.ComponentRef inCref;
+  input DAE.Type inType;
+  input DAE.InstDims inArryDim;
+  output BackendDAE.Var outVar;
+algorithm
+  outVar := match (inCref)
+    local
+      DAE.ElementSource source;
+      list<Absyn.Path> typeLst;
+      Absyn.Path path;
+      BackendDAE.VarKind varKind;
+
+    case (_) guard(ComponentReference.traverseCref(inCref, ComponentReference.crefIsRec, false)) equation
+      DAE.T_COMPLEX(complexClassType=ClassInf.RECORD(path), source=typeLst) = inType;
+      source = DAE.SOURCE(Absyn.dummyInfo, {}, NONE(), {}, path::typeLst, {}, {});
+      varKind = if Types.isDiscreteType(inType) then BackendDAE.DISCRETE() else BackendDAE.VARIABLE();
+      outVar = BackendDAE.VAR(inCref, varKind, DAE.BIDIR(), DAE.NON_PARALLEL(), inType, NONE(), NONE(), inArryDim, source, NONE(), NONE(), NONE(), DAE.NON_CONNECTOR(), DAE.NOT_INNER_OUTER(), true);
+    then outVar;
+
+    else equation
+      varKind = if Types.isDiscreteType(inType) then BackendDAE.DISCRETE() else BackendDAE.VARIABLE();
+      outVar = BackendDAE.VAR(inCref, varKind, DAE.BIDIR(), DAE.NON_PARALLEL(), inType, NONE(), NONE(), inArryDim, DAE.emptyElementSource, NONE(), NONE(), NONE(), DAE.NON_CONNECTOR(), DAE.NOT_INNER_OUTER(), true);
+    then outVar;
+  end match;
+end createCSEArrayVar;
 
 public function copyVarNewName "author: Frenkel TUD 2012-5
   Create variable with new name as cref from other var."
@@ -1692,7 +1733,7 @@ algorithm
       DAE.VarDirection dir;
       DAE.ConnectorType ct;
     case (BackendDAE.VAR(varName = cr,varDirection = dir,connectorType = ct))
-      then topLevelOutput(cr, dir, ct);
+      then DAEUtil.topLevelOutput(cr, dir, ct);
   end match;
 end isVarOnTopLevelAndOutput;
 
@@ -1700,7 +1741,7 @@ public function isVarOnTopLevelAndInput "and has the DAE.VarDirection = INPUT
   The check for top-model is done by splitting the name at '.' and checking if
   the list-length is 1."
   input BackendDAE.Var inVar;
-  output Boolean outBoolean = topLevelInput(inVar.varName, inVar.varDirection, inVar.connectorType);
+  output Boolean outBoolean = DAEUtil.topLevelInput(inVar.varName, inVar.varDirection, inVar.connectorType);
 end isVarOnTopLevelAndInput;
 
 public function isVarOnTopLevelAndInputNoDerInput
@@ -1708,35 +1749,6 @@ public function isVarOnTopLevelAndInputNoDerInput
     output Boolean outBoolean = isVarOnTopLevelAndInput(inVar) and not isRealOptimizeDerInput(inVar);
 end isVarOnTopLevelAndInputNoDerInput;
 
-public function topLevelInput "author: PA
-  Succeeds if variable is input declared at the top level of the model,
-  or if it is an input in a connector instance at top level."
-  input DAE.ComponentRef inComponentRef;
-  input DAE.VarDirection inVarDirection;
-  input DAE.ConnectorType inConnectorType;
-  output Boolean outTopLevelInput;
-algorithm
-  outTopLevelInput := match (inComponentRef,inVarDirection,inConnectorType)
-    case (DAE.CREF_IDENT(), DAE.INPUT(), _) then true;
-    case (DAE.CREF_QUAL(componentRef = DAE.CREF_IDENT()), DAE.INPUT(), DAE.FLOW()) then true;
-    case (DAE.CREF_QUAL(componentRef = DAE.CREF_IDENT()), DAE.INPUT(), DAE.POTENTIAL()) then true;
-    else false;
-  end match;
-end topLevelInput;
-
-protected function topLevelOutput
-  input DAE.ComponentRef inComponentRef;
-  input DAE.VarDirection inVarDirection;
-  input DAE.ConnectorType inConnectorType;
-  output Boolean outTopLevelOutput;
-algorithm
-  outTopLevelOutput := match(inComponentRef, inVarDirection, inConnectorType)
-    case (DAE.CREF_IDENT(), DAE.OUTPUT(), _) then true;
-    case (DAE.CREF_QUAL(componentRef = DAE.CREF_IDENT()), DAE.OUTPUT(), DAE.FLOW()) then true;
-    case (DAE.CREF_QUAL(componentRef = DAE.CREF_IDENT()), DAE.OUTPUT(), DAE.POTENTIAL()) then true;
-    else false;
-  end match;
-end topLevelOutput;
 
 
 public function isFinalVar "Returns true if the variable is final."
@@ -2231,26 +2243,22 @@ public function isTopLevelInputOrOutput "author: LP
               vars: Variables, /* BackendDAE.Variables */
               knownVars: BackendDAE.Variables /* Known BackendDAE.Variables */)
   outputs: bool"
-  input DAE.ComponentRef inComponentRef1;
-  input BackendDAE.Variables inVariables2;
-  input BackendDAE.Variables inVariables3;
+  input DAE.ComponentRef inComponentRef;
+  input BackendDAE.Variables inVars;
+  input BackendDAE.Variables inKnVars;
   output Boolean outBoolean;
 algorithm
-  outBoolean := matchcontinue (inComponentRef1,inVariables2,inVariables3)
+  outBoolean := matchcontinue inComponentRef
     local
       DAE.ComponentRef cr;
-      BackendDAE.Variables vars,knvars;
-    case (cr,vars,_)
-      equation
-        ((BackendDAE.VAR(varName = DAE.CREF_IDENT(), varDirection = DAE.OUTPUT()) :: _),_) = getVar(cr, vars);
-      then
-        true;
-    case (cr,_,knvars)
-      equation
-        ((BackendDAE.VAR(varDirection = DAE.INPUT()) :: _),_) = getVar(cr, knvars) "input variables stored in known variables are input on top level";
-      then
-        true;
-    case (_,_,_) then false;
+      BackendDAE.Var v;
+    case _
+      equation (v::_, _) = getVar(inComponentRef, inVars);
+      then isVarOnTopLevelAndOutput(v);
+    case _
+      equation (v::_, _) = getVar(inComponentRef, inKnVars);
+      then isVarOnTopLevelAndInput(v);
+    else false;
   end matchcontinue;
 end isTopLevelInputOrOutput;
 
@@ -2449,6 +2457,22 @@ algorithm
   end try;
 end existsVar;
 
+public function existsAnyVar
+"author: PA
+  Return true if a variable exists in the vector"
+  input list<DAE.ComponentRef> inComponentRefs;
+  input BackendDAE.Variables inVariables;
+  input Boolean skipDiscrete = false;
+  output Boolean outExists = false;
+algorithm
+  for cref in inComponentRefs loop
+    if existsVar(cref, inVariables, skipDiscrete) and not isState(cref, inVariables) then
+      outExists := true;
+      break;
+    end if;
+  end for;
+end existsAnyVar;
+
 public function makeVar
  input DAE.ComponentRef cr;
  output BackendDAE.Var v = BackendDAE.VAR(cr, BackendDAE.VARIABLE(), DAE.BIDIR(), DAE.NON_PARALLEL(), DAE.T_REAL_DEFAULT, NONE(), NONE(), {}, DAE.emptyElementSource, NONE(), NONE(), NONE(), DAE.NON_CONNECTOR(), DAE.NOT_INNER_OUTER(), false);
@@ -2642,6 +2666,19 @@ public function getVarShared
 algorithm
   (outVarLst, outIntegerLst) := getVar(inComponentRef, inShared.knownVars);
 end getVarShared;
+
+public function containsCref
+  input DAE.ComponentRef cr;
+  input BackendDAE.Variables inVariables;
+  output Boolean outB;
+algorithm
+  try
+    getVar(cr, inVariables);
+    outB := true;
+  else
+    outB := false;
+  end try;
+end containsCref;
 
 public function getVar
 "author: PA
@@ -2870,6 +2907,7 @@ algorithm
   for var in inVars loop
     (_, outIndices) := traversingVarIndexFinder(var, inVariables, outIndices);
   end for;
+  outIndices := listReverse(outIndices);
 end getVarIndexFromVars;
 
 public function getVarIndexFromVariables
@@ -2877,8 +2915,8 @@ public function getVarIndexFromVariables
   input BackendDAE.Variables inVariables2;
   output list<Integer> v_lst;
 algorithm
-  v_lst := traverseBackendDAEVars(inVariables,
-    function traversingVarIndexFinder(inVars = inVariables2), {});
+  v_lst := listReverse(traverseBackendDAEVars(inVariables,
+    function traversingVarIndexFinder(inVars = inVariables2), {}));
 end getVarIndexFromVariables;
 
 protected function traversingVarIndexFinder
@@ -2895,11 +2933,47 @@ algorithm
   try
     cr := varCref(inVar);
     (_, indices) := getVar(cr, inVars);
-    outIndices := listAppend(inIndices, indices);
+    outIndices := listAppend(listReverse(indices), inIndices);
   else
     outIndices := inIndices;
   end try;
 end traversingVarIndexFinder;
+
+public function getVarIndexFromVariablesIndexInFirstSet
+  input BackendDAE.Variables inVariables;
+  input BackendDAE.Variables inVariables2;
+  output list<Integer> v_lst;
+protected
+  array<list<Integer>> a;
+algorithm
+  (a,_) := traverseBackendDAEVars(inVariables,
+    function traversingVarIndexInFirstSetFinder(inVars = inVariables2), (arrayCreate(1,{}),arrayCreate(1,1)));
+  v_lst := listReverse(a[1]);
+end getVarIndexFromVariablesIndexInFirstSet;
+
+protected function traversingVarIndexInFirstSetFinder
+"author: Frenkel TUD 2010-11"
+  input BackendDAE.Var inVar;
+  input BackendDAE.Variables inVars;
+  input tuple<array<list<Integer>>,array<Integer>> inIndices;
+  output BackendDAE.Var outVar = inVar;
+  output tuple<array<list<Integer>>,array<Integer>> outIndices;
+protected
+  DAE.ComponentRef cr;
+  list<Integer> indices1,indices2;
+  array<list<Integer>> l;
+  array<Integer> i;
+algorithm
+  (l,i) := inIndices;
+  outIndices := inIndices;
+  try
+    cr := varCref(inVar);
+    getVar(cr, inVars);
+    l[1] := i[1]::l[1];
+  else
+  end try;
+  i[1] := i[1]+1;
+end traversingVarIndexInFirstSetFinder;
 
 public function mergeVariables
   "Merges two sets of Variables, where the variables of the first set takes

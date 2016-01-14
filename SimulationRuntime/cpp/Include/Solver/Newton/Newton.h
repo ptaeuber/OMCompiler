@@ -5,42 +5,28 @@
 
 #pragma once
 
-#include "FactoryExport.h"
-
 #include <Core/System/IAlgLoop.h>                // Interface to AlgLoo
 #include <Core/Solver/IAlgLoopSolver.h>        // Export function from dll
 #include <Core/Solver/INonLinSolverSettings.h>
 #include <Solver/Newton/NewtonSettings.h>
 
-#include <Core/Utils/extension/logger.hpp>
-
 
 /*****************************************************************************/
 /**
-
 Damped Newton-Raphson Method
-
 The purpose of Newton is to find a zero of a system F of n nonlinear functions in n
 variables y of the form
-
 F(t,y_1,...,y_n) = 0,                (1)
-
 or
-
 f_1(t,y_1,...,y_n) = 0
 ...                   ...
 f_n(t,y_1,...,y_n) = 0
-
 by the use of an iterative Newton method. The solution of the linear system is done
 by Lapack/DGESV, which computes the solution to a real system of linear equations
-
 A * y = B,                            (2)
-
 where A is an n-by-n matrix and y and B are n-by-n(right hand side) matrices.
-
 \date     2008, September, 16th
 \author
-
 */
 /*****************************************************************************
 OSMS(c) 2008
@@ -99,5 +85,5 @@ private:
         *_y_new,
         * _zeroVec;
   long int *_iHelp;
-};
-/** @} */ // end of solverNewton
+
+};/** @} */ // end of solverNewton

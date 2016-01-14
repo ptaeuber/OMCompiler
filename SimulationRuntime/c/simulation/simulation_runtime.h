@@ -60,8 +60,6 @@ extern int initializeResultData(DATA* simData, threadData_t *threadData, int cpu
 
 #endif /* cplusplus */
 
-extern int measure_time_flag;
-
 extern int modelTermination;     /* Becomes non-zero when simulation terminates. */
 extern int terminationTerminate; /* Becomes non-zero when user terminates simulation. */
 extern int terminationAssert;    /* Becomes non-zero when model call assert simulation. */
@@ -86,8 +84,6 @@ extern void communicateMsg(char id, unsigned int size, const char *data);
  * simulation runtime no longer has main, is defined by the generated model code which calls this function.
  */
 extern int _main_SimulationRuntime(int argc, char**argv, DATA *data, threadData_t *threadData);
-
-extern void parseVariableStr(char* variableStr);
 
 #ifdef __cplusplus
 }

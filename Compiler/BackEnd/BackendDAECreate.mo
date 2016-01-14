@@ -60,6 +60,7 @@ protected import DynamicOptimization;
 protected import Error;
 protected import Expression;
 protected import ExpressionDump;
+protected import ExpressionSolve;
 protected import Flags;
 protected import Global;
 protected import HashTableExpToExp;
@@ -122,7 +123,8 @@ algorithm
   extVars := BackendVariable.listVar(extvarlst);
   aliasVars := BackendVariable.emptyVars();
   if Flags.isSet(Flags.VECTORIZE) then
-    (vars,eqns) := Vectorization.buildForLoops(vars,eqns);
+    (varlst,eqns) := Vectorization.collectForLoops(varlst,eqns);
+    vars := BackendVariable.listVar(varlst);
   end if;
   // handle alias equations
   (vars, knvars, extVars, aliasVars, eqns, reqns, ieqns) := handleAliasEquations(aliaseqns, vars, knvars, extVars, aliasVars, eqns, reqns, ieqns);
@@ -132,7 +134,7 @@ algorithm
   reqnarr := BackendEquation.listEquation(reqns);
   ieqnarr := BackendEquation.listEquation(ieqns);
   einfo := BackendDAE.EVENT_INFO(timeEvents, {}, {}, {}, 0);
-  symjacs := {(NONE(), ({}, {}, ({}, {})), {}), (NONE(), ({}, {}, ({}, {})), {}), (NONE(), ({}, {}, ({}, {})), {}), (NONE(), ({}, {}, ({}, {})), {})};
+  symjacs := {(NONE(), ({}, {}, ({}, {}), -1), {}), (NONE(), ({}, {}, ({}, {}), -1), {}), (NONE(), ({}, {}, ({}, {}), -1), {}), (NONE(), ({}, {}, ({}, {}), -1), {})};
   outBackendDAE := BackendDAE.DAE(BackendDAEUtil.createEqSystem(vars_1, eqnarr, {}, BackendDAE.UNKNOWN_PARTITION(), reqnarr)::{},
                                   BackendDAE.SHARED(knvars,
                                                     extVars,
@@ -425,9 +427,9 @@ protected function transformBuiltinExpression "author: lochel
   output DAE.Exp outExp;
   output tuple<HashTableExpToIndex.HashTable, Integer /*iDelay*/, Integer /*iSample*/, list<BackendDAE.TimeEvent>> outTuple;
 algorithm
-  (outExp,outTuple) := matchcontinue (inExp,inTuple)
+  (outExp,outTuple) := matchcontinue (inExp, inTuple)
     local
-      DAE.Exp e, start, interval;
+      DAE.Exp start, interval;
       list<DAE.Exp> es;
       HashTableExpToIndex.HashTable ht;
       Integer iDelay, iSample, i;
@@ -435,29 +437,27 @@ algorithm
       DAE.CallAttributes attr;
 
     // delay [already in ht]
-    case (e as DAE.CALL(Absyn.IDENT("delay"), es, attr), (ht, iDelay, iSample, timeEvents)) equation
-      i = BaseHashTable.get(e, ht);
+    case (DAE.CALL(Absyn.IDENT("delay"), es, attr), (ht, iDelay, iSample, timeEvents)) equation
+      i = BaseHashTable.get(inExp, ht);
     then (DAE.CALL(Absyn.IDENT("delay"), DAE.ICONST(i)::es, attr), (ht, iDelay, iSample, timeEvents));
 
     // delay [not yet in ht]
-    case (e as DAE.CALL(Absyn.IDENT("delay"), es, attr), (ht, iDelay, iSample, timeEvents)) equation
-      ht = BaseHashTable.add((e, iDelay+1), ht);
+    case (DAE.CALL(Absyn.IDENT("delay"), es, attr), (ht, iDelay, iSample, timeEvents)) equation
+      ht = BaseHashTable.add((inExp, iDelay+1), ht);
     then (DAE.CALL(Absyn.IDENT("delay"), DAE.ICONST(iDelay)::es, attr), (ht, iDelay+1, iSample, timeEvents));
 
     // sample [already in ht]
-    case (e as DAE.CALL(Absyn.IDENT("sample"), es, attr), (ht, iDelay, iSample, timeEvents))
-    guard (not Types.isClockOrSubTypeClock(Expression.typeof(listGet(es, 2))))
-      equation
-        i = BaseHashTable.get(e, ht);
+    case (DAE.CALL(Absyn.IDENT("sample"), es as {start, interval}, attr), (ht, iDelay, iSample, timeEvents))
+    guard (not Types.isClockOrSubTypeClock(Expression.typeof(interval))) equation
+      i = BaseHashTable.get(inExp, ht);
     then (DAE.CALL(Absyn.IDENT("sample"), DAE.ICONST(i)::es, attr), (ht, iDelay, iSample, timeEvents));
 
     // sample [not yet in ht]
-    case (e as DAE.CALL(Absyn.IDENT("sample"), es as {start, interval}, attr), (ht, iDelay, iSample, timeEvents))
-    guard (not Types.isClockOrSubTypeClock(Expression.typeof(listGet(es, 2))))
-      equation
-        iSample = iSample+1;
-        timeEvents = listAppend(timeEvents, {BackendDAE.SAMPLE_TIME_EVENT(iSample, start, interval)});
-        ht = BaseHashTable.add((e, iSample), ht);
+    case (DAE.CALL(Absyn.IDENT("sample"), es as {start, interval}, attr), (ht, iDelay, iSample, timeEvents))
+    guard (not Types.isClockOrSubTypeClock(Expression.typeof(interval))) equation
+      iSample = iSample+1;
+      timeEvents = listAppend(timeEvents, {BackendDAE.SAMPLE_TIME_EVENT(iSample, start, interval)});
+      ht = BaseHashTable.add((inExp, iSample), ht);
     then (DAE.CALL(Absyn.IDENT("sample"), DAE.ICONST(iSample)::es, attr), (ht, iDelay, iSample, timeEvents));
 
     else (inExp,inTuple);
@@ -542,7 +542,7 @@ algorithm
         outVars := lowerDynamicVar(inElement, inFunctions) :: outVars;
         (e2, src) := Inline.inlineExp(e2, (SOME(inFunctions), {DAE.NORM_INLINE()}), src);
         e1 := Expression.crefExp(cr);
-        attr := BackendDAE.EQUATION_ATTRIBUTES(false, BackendDAE.BINDING_EQUATION(), BackendDAE.NO_LOOP());
+        attr := BackendDAE.EQUATION_ATTRIBUTES(false, BackendDAE.BINDING_EQUATION());
         outEqns := BackendDAE.EQUATION(e1, e2, src, attr) :: outEqns;
       then
         ();
@@ -635,7 +635,7 @@ algorithm
         dae_var_attr = DAEUtil.setProtectedAttr(dae_var_attr, b);
         dae_var_attr = setMinMaxFromEnumeration(t, dae_var_attr);
         (dae_var_attr, source, _) = Inline.inlineStartAttribute(dae_var_attr, source, (SOME(functionTree), {DAE.NORM_INLINE()}));
-    ts = BackendDAEUtil.setTearingSelectAttribute(comment);
+        ts = BackendDAEUtil.setTearingSelectAttribute(comment);
       then
         (BackendDAE.VAR(name, kind_1, dir, prl, tp, NONE(), NONE(), dims, source, dae_var_attr, ts, comment, ct, DAEUtil.toDAEInnerOuter(io), false));
   end match;
@@ -915,7 +915,7 @@ algorithm
 
     else
       algorithm
-        false := BackendVariable.topLevelInput(inComponentRef, inVarDirection, inConnectorType);
+        false := DAEUtil.topLevelInput(inComponentRef, inVarDirection, inConnectorType);
       then
         match (inVarKind, inType)
           case (DAE.VARIABLE(), DAE.T_BOOL()) then BackendDAE.DISCRETE();
@@ -942,7 +942,7 @@ algorithm
     case (DAE.CONST(), _, _, _) then BackendDAE.CONST();
     case (DAE.VARIABLE(), _, _, _)
       equation
-        true = BackendVariable.topLevelInput(inComponentRef, inVarDirection, inConnectorType);
+        true = DAEUtil.topLevelInput(inComponentRef, inVarDirection, inConnectorType);
       then
         BackendDAE.VARIABLE();
     // adrpo: topLevelInput might fail!
@@ -1559,7 +1559,7 @@ algorithm
         true = DAEUtil.expTypeComplex(tp);
         size = Expression.sizeOf(tp);
       then
-        BackendDAE.COMPLEX_EQUATION(size, inExp1, inExp2, source, BackendDAE.EQUATION_ATTRIBUTES(false, inEqKind, BackendDAE.NO_LOOP()))::inEqns;
+        BackendDAE.COMPLEX_EQUATION(size, inExp1, inExp2, source, BackendDAE.EQUATION_ATTRIBUTES(false, inEqKind))::inEqns;
 
     // array types to array equations
     case (_, _, _, _, _, _)
@@ -1577,7 +1577,7 @@ algorithm
         true = Types.isTuple(tp);
         size = Expression.sizeOf(tp);
       then
-        BackendDAE.COMPLEX_EQUATION(size, inExp1, inExp2, source, BackendDAE.EQUATION_ATTRIBUTES(false, inEqKind, BackendDAE.NO_LOOP()))::inEqns;
+        BackendDAE.COMPLEX_EQUATION(size, inExp1, inExp2, source, BackendDAE.EQUATION_ATTRIBUTES(false, inEqKind))::inEqns;
 
     // other types
     case (_, _, _, _, _, _)
@@ -1589,7 +1589,7 @@ algorithm
         false = b1 or b2 or b3;
         //Error.assertionOrAddSourceMessage(not b1, Error.INTERNAL_ERROR, {str}, Absyn.dummyInfo);
       then
-        BackendDAE.EQUATION(inExp1, inExp2, source, BackendDAE.EQUATION_ATTRIBUTES(false, inEqKind, BackendDAE.NO_LOOP()))::inEqns;
+        BackendDAE.EQUATION(inExp1, inExp2, source, BackendDAE.EQUATION_ATTRIBUTES(false, inEqKind))::inEqns;
     else
       equation
         // show only on failtrace!
@@ -1635,12 +1635,12 @@ algorithm
         ds = List.map1(ds, intMul, i);
         //For COMPLEX_EQUATION
         //i = List.fold(ds, intMul, 1);
-      then BackendDAE.ARRAY_EQUATION(ds, e1, e2, source, BackendDAE.EQUATION_ATTRIBUTES(false, inEqKind, BackendDAE.NO_LOOP()))::iAcc;
+      then BackendDAE.ARRAY_EQUATION(ds, e1, e2, source, BackendDAE.EQUATION_ATTRIBUTES(false, inEqKind))::iAcc;
 
     case (_, _, _, _, _, _)
       equation
         ds = Expression.dimensionsSizes(dims);
-      then BackendDAE.ARRAY_EQUATION(ds, e1, e2, source, BackendDAE.EQUATION_ATTRIBUTES(false, inEqKind, BackendDAE.NO_LOOP()))::iAcc;
+      then BackendDAE.ARRAY_EQUATION(ds, e1, e2, source, BackendDAE.EQUATION_ATTRIBUTES(false, inEqKind))::iAcc;
   end matchcontinue;
 end lowerArrayEqn;
 
@@ -1658,7 +1658,7 @@ algorithm
       list<DAE.Exp> e1lst, e2lst;
     case ({}, {}, _, _, _) then iAcc;
     case (e1::e1lst, e2::e2lst, _, _, _)
-      then generateEquations(e1lst, e2lst, source, inEqKind, BackendDAE.EQUATION(e1, e2, source, BackendDAE.EQUATION_ATTRIBUTES(false, inEqKind, BackendDAE.NO_LOOP()))::iAcc);
+      then generateEquations(e1lst, e2lst, source, inEqKind, BackendDAE.EQUATION(e1, e2, source, BackendDAE.EQUATION_ATTRIBUTES(false, inEqKind))::iAcc);
   end match;
 end generateEquations;
 
@@ -1688,7 +1688,7 @@ algorithm
   outEqs := BackendDAE.EQUATION( exp = DAE.CREF(componentRef = cr, ty = DAE.T_CLOCK_DEFAULT),
                                 scalar = e,  source = DAE.emptyElementSource,
                                 attr = BackendDAE.EQ_ATTR_DEFAULT_DYNAMIC ) :: inEqs;
-  outEqAttrs := BackendDAE.EQUATION_ATTRIBUTES(false, BackendDAE.CLOCKED_EQUATION(whenClkCnt), BackendDAE.NO_LOOP());
+  outEqAttrs := BackendDAE.EQUATION_ATTRIBUTES(false, BackendDAE.CLOCKED_EQUATION(whenClkCnt));
 end createWhenClock;
 
 
@@ -1760,8 +1760,7 @@ protected function lowerWhenEqn2
 protected
   Inline.Functiontuple fns = (SOME(functionTree), {DAE.NORM_INLINE()});
 algorithm
-  (outEquationLst, outREquationLst):=
-  matchcontinue inDAEElementLst
+  (outEquationLst, outREquationLst) := matchcontinue inDAEElementLst
     local
       Integer size;
       list<BackendDAE.Equation> eqnl;
@@ -1795,6 +1794,7 @@ algorithm
 
     case DAE.DEFINE(componentRef = cr, exp = e, source = source)::xs
       equation
+        (e, _) = ExpressionSolve.solve(Expression.crefExp(cr), e, Expression.crefExp(cr));
         (DAE.PARTIAL_EQUATION(e), source) = Inline.simplifyAndInlineEquationExp(DAE.PARTIAL_EQUATION(e), fns, source);
         whenOp = BackendDAE.ASSIGN(cr, e, source);
         whenEq = BackendDAE.WHEN_STMTS(inCond, {whenOp}, NONE());
@@ -1811,15 +1811,19 @@ algorithm
       then
         (eqnl, reqnl);
 
-    case DAE.EQUATION(exp = (cre as DAE.CREF(componentRef = cr)), scalar = e, source = source)::xs
-      equation
-        (DAE.EQUALITY_EXPS(_,e), source) = Inline.simplifyAndInlineEquationExp(DAE.EQUALITY_EXPS(cre,e), fns, source);
-        whenOp = BackendDAE.ASSIGN(cr, e, source);
-        whenEq = BackendDAE.WHEN_STMTS(inCond, {whenOp}, NONE());
-        eq = BackendDAE.WHEN_EQUATION(1, whenEq, source, BackendDAE.EQ_ATTR_DEFAULT_DYNAMIC);
-        (eqnl, reqnl) = lowerWhenEqn2(xs, inCond, functionTree, eq::iEquationLst, iREquationLst);
-      then
-        (eqnl, reqnl);
+    case (el as DAE.EQUATION(exp = (cre as DAE.CREF(componentRef = cr)), scalar = e, source = source))::xs algorithm
+      try
+        e := ExpressionSolve.solve(cre, e, cre);
+      else
+        Error.addCompilerError("Failed to solve " + DAEDump.dumpElementsStr({el}));
+        fail();
+      end try;
+      (DAE.EQUALITY_EXPS(_,e), source) := Inline.simplifyAndInlineEquationExp(DAE.EQUALITY_EXPS(cre,e), fns, source);
+      whenOp := BackendDAE.ASSIGN(cr, e, source);
+      whenEq := BackendDAE.WHEN_STMTS(inCond, {whenOp}, NONE());
+      eq := BackendDAE.WHEN_EQUATION(1, whenEq, source, BackendDAE.EQ_ATTR_DEFAULT_DYNAMIC);
+      (eqnl, reqnl) := lowerWhenEqn2(xs, inCond, functionTree, eq::iEquationLst, iREquationLst);
+    then (eqnl, reqnl);
 
     case DAE.COMPLEX_EQUATION(lhs = (cre as DAE.CREF(componentRef = cr)), rhs = e, source = source)::xs
       equation
@@ -1840,7 +1844,7 @@ algorithm
       then
         (eqnl, reqnl);
 
-    case (DAE.IF_EQUATION(condition1=expl, equations2=eqnslst, equations3=eqns, source = source))::xs
+    case DAE.IF_EQUATION(condition1=expl, equations2=eqnslst, equations3=eqns, source = source)::xs
       equation
         (expl, source, _) = Inline.inlineExps(expl, fns, source);
         // transform if eqution

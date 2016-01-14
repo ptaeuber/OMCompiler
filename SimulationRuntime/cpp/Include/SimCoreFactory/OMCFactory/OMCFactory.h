@@ -8,10 +8,22 @@
 #define LOADER_ERROR_UNDEFINED_REFERENCES   ( -2 )
 #define LOADER_ERROR_FILE_NOT_FOUND         ( -3 )
 #define LOADER_ERROR_FUNC_NOT_FOUND         ( -4 )
+
+/** Minimal OMCFactory for statically linked solvers */
+class BaseOMCFactory {
+  public:
+    BaseOMCFactory() {}
+    BaseOMCFactory(PATH library_path, PATH modelicasystem_path) {}
+    ~BaseOMCFactory() {}
+};
+
 typedef int LOADERRESULT;
 class ISimController;
 struct SimSettings;
 
+/**
+ * Create a dynamically linked simulator and serve for solver factories
+ */
 class OMCFactory
 {
 public:
@@ -29,7 +41,7 @@ public:
    * @param argv command line arguments of main function
    * @param opts default options that are overridden with argv
    */
-  virtual std::pair<boost::shared_ptr<ISimController>,SimSettings> createSimulation(int argc, const char* argv[], std::map<std::string, std::string> &opts);
+  virtual std::pair<shared_ptr<ISimController>,SimSettings> createSimulation(int argc, const char* argv[], std::map<std::string, std::string> &opts);
 
 protected:
   /**
@@ -74,13 +86,15 @@ protected:
   void fillArgumentsToIgnore();
   void fillArgumentsToReplace();
 
-  //boost::shared_ptr<ISimController> _simController;
+  virtual shared_ptr<ISimController> loadSimControllerLib(PATH simcontroller_path, type_map simcontroller_type_map);
+
+  //shared_ptr<ISimController> _simController;
   map<string,shared_library> _modules;
   string _defaultLinSolver;
   string _defaultNonLinSolver;
   PATH _library_path;
   PATH _modelicasystem_path;
-  boost::unordered_set<string> _argumentsToIgnore; //a set of arguments that should be ignored
+  unordered_set<string> _argumentsToIgnore; //a set of arguments that should be ignored
   std::map<string, string> _argumentsToReplace; //a mapping to replace arguments (e.g. -r=... -> -F=...)
   std::string _overrideOMEdit; // unrecognized options if called from OMEdit
 };

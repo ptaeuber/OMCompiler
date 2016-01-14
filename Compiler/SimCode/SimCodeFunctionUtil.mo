@@ -242,7 +242,7 @@ algorithm
         "Template did not find the simulation variable for "+ ComponentReference.printComponentRefStr(cref) + ". ";
         Error.addInternalError(errstr, sourceInfo());*/
       then
-         SimCodeVar.SIMVAR(badcref, BackendDAE.VARIABLE(), "", "", "", -2, NONE(), NONE(), NONE(), NONE(), false, DAE.T_REAL_DEFAULT, false, NONE(), SimCodeVar.NOALIAS(), DAE.emptyElementSource, SimCodeVar.INTERNAL(), NONE(), {}, false, true);
+         SimCodeVar.SIMVAR(badcref, BackendDAE.VARIABLE(), "", "", "", -2, NONE(), NONE(), NONE(), NONE(), false, DAE.T_REAL_DEFAULT, false, NONE(), SimCodeVar.NOALIAS(), DAE.emptyElementSource, SimCodeVar.INTERNAL(), NONE(), {}, false, true, false);
   end matchcontinue;
 end cref2simvar;
 
@@ -1800,7 +1800,7 @@ algorithm
         includes := generateExtFunctionIncludesIncludestr(mod);
         (libs, dirs, resources) := generateExtFunctionLibraryDirectoryFlags(program, path, mod, libs);
         for name in if Flags.isSet(Flags.CHECK_EXT_LIBS) then libNames else {} loop
-          if target=="msvc" or System.os()=="Windows_NT" then
+          if getGerneralTarget(target)=="msvc" or System.os()=="Windows_NT" then
             fullLibNames := {name + System.getDllExt(), "lib" + name + ".a", "lib" + name + ".lib"};
           else
             fullLibNames := {"lib" + name + ".a", "lib" + name + System.getDllExt()};
@@ -1958,8 +1958,22 @@ protected function generateExtFunctionLibraryDirectoryFlags2
   output list<String> libs;
 algorithm
   libs := if isLinux then "-Wl,-rpath=\"" + dir + "\""::inLibs else inLibs;
-  libs := (if target=="msvc" then "/LIBPATH:\"" + dir + "\"" else "\"-L" + dir + "\"")::libs;
+  libs := (if getGerneralTarget(target)=="msvc" then "/LIBPATH:\"" + dir + "\"" else "\"-L" + dir + "\"")::libs;
 end generateExtFunctionLibraryDirectoryFlags2;
+
+protected function getGerneralTarget
+   input String target;
+  output String generalTarget;
+  algorithm
+  generalTarget := matchcontinue (target)
+  case("msvc10")then "msvc";
+  case("msvc12")then "msvc";
+  case("msvc13")then "msvc";
+  case("msvc14")then "msvc";
+  else target;
+ end matchcontinue;
+end getGerneralTarget;
+
 
 protected function userCompiledBinariesDirectory
   input Absyn.Path path;
@@ -2147,7 +2161,7 @@ protected function generateExtFunctionIncludesLibstr
   output list<String> outStringLst;
   output list<String> names;
 algorithm
-  (outStringLst, names) := matchcontinue (target,inMod)
+  (outStringLst, names) := matchcontinue (getGerneralTarget(target),inMod)
     local
       list<Absyn.Exp> arr;
       list<String> libs;
@@ -2755,6 +2769,7 @@ public function createMakefileParams
   input list<String> libs;
   input list<String> libPaths;
   input Boolean isFunction;
+  input Boolean isFMU=false;
   output SimCode.MakefileParams makefileParams;
 protected
   String omhome, ccompiler, cxxcompiler, linker, exeext, dllext, cflags, ldflags, rtlibs, platform, fopenmp,compileDir;
@@ -2771,7 +2786,7 @@ algorithm
             (if Flags.isSet(Flags.HPCOM) then "-fopenmp" else "");
   cflags := if stringEq(Config.simCodeTarget(),"JavaScript") then "-Os -Wno-warn-absolute-paths" else cflags;
   ldflags := System.getLDFlags();
-  rtlibs := if isFunction then System.getRTLibs() else System.getRTLibsSim();
+  rtlibs := if isFunction then System.getRTLibs() else (if isFMU then System.getRTLibsFMU() else System.getRTLibsSim());
   platform := System.modelicaPlatform();
   compileDir :=  System.pwd() + System.pathDelimiter();
   makefileParams := SimCode.MAKEFILE_PARAMS(ccompiler, cxxcompiler, linker, exeext, dllext,
@@ -2815,6 +2830,12 @@ algorithm
   end match;
 end codegenPeekTryThrowIndex;
 
+public function execStatReset
+algorithm
+  System.realtimeTick(ClockIndexes.RT_CLOCK_EXECSTAT);
+  System.realtimeTick(ClockIndexes.RT_CLOCK_EXECSTAT_CUMULATIVE);
+end execStatReset;
+
 public function execStat
   "Prints an execution stat on the format:
   *** %name% -> time: %time%, memory %memory%
@@ -2823,35 +2844,24 @@ public function execStat
   consumed by the compiler at this point in time.
   "
   input String name;
+protected
+  Real t, total;
+  String timeStr, totalTimeStr, gcStr;
 algorithm
-  execStat2(Flags.isSet(Flags.EXEC_STAT),name);
-end execStat;
-
-protected function execStat2
-  input Boolean cond;
-  input String name;
-algorithm
-  _ := match (cond,name)
-    local
-      Real t,total,used,allocated;
-      String timeStr,totalTimeStr,gcStr;
-    case (false,_) then ();
+  if Flags.isSet(Flags.EXEC_STAT) then
+    t := System.realtimeTock(ClockIndexes.RT_CLOCK_EXECSTAT);
+    total := System.realtimeTock(ClockIndexes.RT_CLOCK_EXECSTAT_CUMULATIVE);
+    gcStr := GC.profStatsStr(GC.getProfStats(), head="");
+    timeStr := System.snprintff("%.4g", 20, t);
+    totalTimeStr := System.snprintff("%.4g", 20, total);
+    if Flags.isSet(Flags.GC_PROF) then
+      Error.addMessage(Error.EXEC_STAT_GC, {name, timeStr, totalTimeStr, gcStr});
     else
-      equation
-        t = System.realtimeTock(ClockIndexes.RT_CLOCK_EXECSTAT);
-        total = System.realtimeTock(ClockIndexes.RT_CLOCK_EXECSTAT_CUMULATIVE);
-        gcStr = GC.profStatsStr(GC.getProfStats(), head="");
-        timeStr = System.snprintff("%.4g",20,t);
-        totalTimeStr = System.snprintff("%.4g",20,total);
-        if Flags.isSet(Flags.GC_PROF) then
-          Error.addMessage(Error.EXEC_STAT_GC,{name,timeStr,totalTimeStr,gcStr});
-        else
-          Error.addMessage(Error.EXEC_STAT,{name,timeStr,totalTimeStr});
-        end if;
-        System.realtimeTick(ClockIndexes.RT_CLOCK_EXECSTAT);
-      then ();
-  end match;
-end execStat2;
+      Error.addMessage(Error.EXEC_STAT, {name, timeStr, totalTimeStr});
+    end if;
+    System.realtimeTick(ClockIndexes.RT_CLOCK_EXECSTAT);
+  end if;
+end execStat;
 
 public function varIndex
   input SimCodeVar.SimVar var;

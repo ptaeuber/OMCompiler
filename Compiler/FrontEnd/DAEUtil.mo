@@ -113,6 +113,51 @@ algorithm
   end match;
 end dumpVarParallelismStr;
 
+public function topLevelInput "author: PA
+  if variable is input declared at the top level of the model,
+  or if it is an input in a connector instance at top level return true."
+  input DAE.ComponentRef inComponentRef;
+  input DAE.VarDirection inVarDirection;
+  input DAE.ConnectorType inConnectorType;
+  output Boolean isTopLevel;
+algorithm
+  isTopLevel := match (inVarDirection, inComponentRef)
+    case (DAE.INPUT(), DAE.CREF_IDENT()) then true;
+    case (DAE.INPUT(), _)
+      guard(ConnectUtil.faceEqual(ConnectUtil.componentFaceType(inComponentRef), Connect.OUTSIDE()))
+      then topLevelConnectorType(inConnectorType);
+    else false;
+  end match;
+end topLevelInput;
+
+public function topLevelOutput "author: PA
+  if variable is output declared at the top level of the model,
+  or if it is an output in a connector instance at top level return true."
+  input DAE.ComponentRef inComponentRef;
+  input DAE.VarDirection inVarDirection;
+  input DAE.ConnectorType inConnectorType;
+  output Boolean isTopLevel;
+algorithm
+  isTopLevel := match (inVarDirection, inComponentRef)
+    case (DAE.OUTPUT(), DAE.CREF_IDENT()) then true;
+    case (DAE.OUTPUT(), _)
+      guard(ConnectUtil.faceEqual(ConnectUtil.componentFaceType(inComponentRef), Connect.OUTSIDE()))
+      then topLevelConnectorType(inConnectorType);
+    else false;
+  end match;
+end topLevelOutput;
+
+protected function topLevelConnectorType
+  input DAE.ConnectorType inConnectorType;
+  output Boolean isTopLevel;
+algorithm
+  isTopLevel := match (inConnectorType)
+    case DAE.FLOW() then true;
+    case DAE.POTENTIAL() then true;
+    else false;
+  end match;
+end topLevelConnectorType;
+
 public function expTypeSimple "returns true if type is simple type"
   input DAE.Type tp;
   output Boolean isSimple;
@@ -2593,7 +2638,7 @@ algorithm
     else
       equation
         true = Flags.isSet(Flags.FAILTRACE);
-        msg = stringDelimitList(List.mapMap(getFunctionList(functions), functionName, Absyn.pathString), "\n  ");
+        msg = stringDelimitList(List.mapMap(getFunctionList(functions), functionName, Absyn.pathStringDefault), "\n  ");
         msg = "DAEUtil.getNamedFunction failed: " + Absyn.pathString(path) + "\nThe following functions were part of the cache:\n  " + msg;
         // Error.addMessage(Error.INTERNAL_ERROR,{msg});
         Debug.traceln(msg);
@@ -2615,7 +2660,7 @@ algorithm
     case (_,_,_) then Util.getOption(avlTreeGet(functions, path));
     else
       equation
-        msg = stringDelimitList(List.mapMap(getFunctionList(functions), functionName, Absyn.pathString), "\n  ");
+        msg = stringDelimitList(List.mapMap(getFunctionList(functions), functionName, Absyn.pathStringDefault), "\n  ");
         msg = "DAEUtil.getNamedFunction failed: " + Absyn.pathString(path) + "\nThe following functions were part of the cache:\n  " + msg;
         Error.addSourceMessage(Error.INTERNAL_ERROR,{msg},info);
       then fail();
@@ -3689,7 +3734,7 @@ algorithm
       equation
         lst = avlTreeToList(ft);
         lstInvalid = List.select(lst, isInvalidFunctionEntry);
-        str = stringDelimitList(List.map(List.map(lstInvalid, Util.tuple21), Absyn.pathString), "\n ");
+        str = stringDelimitList(list(Absyn.pathString(p) for p in List.map(lstInvalid, Util.tuple21)), "\n ");
         str = "\n " + str + "\n";
         Error.addMessage(Error.NON_INSTANTIATED_FUNCTION, {str});
         fns = List.mapMap(List.select(lst, isValidFunctionEntry), Util.tuple22, Util.getOption);
@@ -3702,7 +3747,7 @@ public function getFunctionNames
   input DAE.FunctionTree ft;
   output list<String> strs;
 algorithm
-  strs := List.mapMap(getFunctionList(ft), functionName, Absyn.pathString);
+  strs := List.mapMap(getFunctionList(ft), functionName, Absyn.pathStringDefault);
 end getFunctionNames;
 
 protected function isInvalidFunctionEntry
@@ -4442,7 +4487,7 @@ algorithm
         ({ew_1}, extraArg) = traverseDAEEquationsStmtsList({ew},func,opt,extraArg);
         (stmts2, extraArg) = traverseDAEEquationsStmtsList(stmts,func,opt,extraArg);
         (e_1, extraArg) = func(e, extraArg);
-        x = if referenceEq(ew,ew_1) and referenceEq(e,e_1) and referenceEq(stmts,stmts2) then inStmt else DAE.STMT_WHEN(e_1,conditions,initialCall,stmts2,SOME(ew),source);
+        x = if referenceEq(ew,ew_1) and referenceEq(e,e_1) and referenceEq(stmts,stmts2) then inStmt else DAE.STMT_WHEN(e_1,conditions,initialCall,stmts2,SOME(ew_1),source);
       then (x::{},extraArg);
 
     case (DAE.STMT_ASSERT(cond = e, msg=e2, level=e3, source = source),_,_,extraArg)

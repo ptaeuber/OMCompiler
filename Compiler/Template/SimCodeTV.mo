@@ -199,7 +199,7 @@ package SimCodeVar
       list<SimVar> jacobianVars;
       list<SimVar> realOptimizeConstraintsVars;
       list<SimVar> realOptimizeFinalConstraintsVars;
-      list<SimCodeVar.SimVar> mixedArrayVars;
+      list<SimVar> mixedArrayVars;
     end SIMVARS;
   end SimVars;
 
@@ -226,6 +226,7 @@ package SimCodeVar
       list<String> numArrayElement;
       Boolean isValueChangeable;
       Boolean isProtected;
+      Boolean hideResult;
     end SIMVAR;
   end SimVar;
 
@@ -275,6 +276,7 @@ package SimCode
       Boolean useSymbolicInitialization;         // true if a system to solve the initial problem symbolically is generated, otherwise false
       Boolean useHomotopy;                       // true if homotopy(...) is used during initialization
       list<SimEqSystem> initialEquations;
+      list<SimEqSystem> initialEquations_lambda0;
       list<SimEqSystem> removedInitialEquations;
       list<SimEqSystem> startValueEquations;
       list<SimEqSystem> nominalValueEquations;
@@ -302,8 +304,18 @@ package SimCode
       HpcOmSimCode.HpcOmData hpcomData;
       HashTableCrIListArray.HashTable varToArrayIndexMapping;
       Option<FmiModelStructure> modelStructure;
+      PartitionData partitionData;
     end SIMCODE;
   end SimCode;
+
+	uniontype PartitionData
+	  record PARTITIONDATA
+	    Integer numPartitions;
+	    list<list<Integer>> partitions; // which equations are assigned to the partitions
+	    list<list<Integer>> activatorsForPartitions; // which activators can activate each partition
+	    list<Integer> stateToActivators; // which states belong to which activator
+	  end PARTITIONDATA;
+	end PartitionData;
 
   uniontype ClockedPartition
     record CLOCKED_PARTITION
@@ -700,6 +712,12 @@ package SimCode
     end FMIDERIVATIVES;
   end FmiDerivatives;
 
+  uniontype FmiDiscreteStates
+    record FMIDISCRETESTATES
+      list<FmiUnknown> fmiUnknownsList;
+    end FMIDISCRETESTATES;
+  end FmiDiscreteStates;
+
   uniontype FmiInitialUnknowns
     record FMIINITIALUNKNOWNS
       list<FmiUnknown> fmiUnknownsList;
@@ -710,6 +728,7 @@ package SimCode
     record FMIMODELSTRUCTURE
       FmiOutputs fmiOutputs;
       FmiDerivatives fmiDerivatives;
+      FmiDiscreteStates fmiDiscreteStates;
       FmiInitialUnknowns fmiInitialUnknowns;
     end FMIMODELSTRUCTURE;
   end FmiModelStructure;
@@ -807,9 +826,17 @@ package SimCodeUtil
     output list<SimCode.SimEqSystem> oEqs;
   end getDaeEqsNotPartOfOdeSystem;
 
+  function getValueReference
+    input SimCodeVar.SimVar inSimVar;
+    input SimCode.SimCode inSimCode;
+    input Boolean inElimNegAliases;
+    output String outValueReference;
+  end getValueReference;
+
   function getVarIndexListByMapping
     input HashTableCrIListArray.HashTable iVarToArrayIndexMapping;
     input DAE.ComponentRef iVarName;
+    input Boolean iColumnMajor;
     input String iIndexForUndefinedReferences;
     output list<String> oVarIndexList;
   end getVarIndexListByMapping;
@@ -817,6 +844,7 @@ package SimCodeUtil
   function getVarIndexByMapping
     input HashTableCrIListArray.HashTable iVarToArrayIndexMapping;
     input DAE.ComponentRef iVarName;
+    input Boolean iColumnMajor;
     input String iIndexForUndefinedReferences;
     output String oVarIndex;
   end getVarIndexByMapping;
@@ -831,6 +859,25 @@ package SimCodeUtil
     input list<SimCode.ClockedPartition> inPartitions;
     output list<SimCode.SubPartition> outSubPartitions;
   end getSubPartitions;
+
+  function getClockIndex
+    input SimCodeVar.SimVar simVar;
+    input SimCode.SimCode simCode;
+    output Option<Integer> clockIndex;
+  end getClockIndex;
+
+  function computeDependencies
+    input list<SimCode.SimEqSystem> eqs;
+    input DAE.ComponentRef cref;
+    output list<SimCode.SimEqSystem> deps;
+  end computeDependencies;
+
+	function getSimEqSystemsByIndexLst
+	  input list<Integer> idcs;
+	  input list<SimCode.SimEqSystem> allSes;
+	  output list<SimCode.SimEqSystem> sesOut;
+	end getSimEqSystemsByIndexLst;
+
 end SimCodeUtil;
 
 package SimCodeFunctionUtil
@@ -994,6 +1041,9 @@ package BackendDAE
     record STATE_DER end STATE_DER;
     record DUMMY_DER end DUMMY_DER;
     record DUMMY_STATE end DUMMY_STATE;
+    record CLOCKED_STATE
+      DAE.ComponentRef previousName "the name of the previous variable";
+    end CLOCKED_STATE;
     record DISCRETE end DISCRETE;
     record PARAM end PARAM;
     record CONST end CONST;
@@ -1264,11 +1314,12 @@ package Absyn
     end THREAD;
   end ReductionIterType;
 
-  function pathString2NoLeadingDot "Tail-recursive version, with string builder (stringDelimitList is optimised)"
+  function pathString
     input Path path;
     input String delimiter;
+    input Boolean usefq;
     output String outString;
-  end pathString2NoLeadingDot;
+  end pathString;
 
   function pathLastIdent
     input Path inPath;
@@ -2977,6 +3028,11 @@ package ComponentReference
     input DAE.ComponentRef inComponentRef;
     output DAE.ComponentRef outComponentRef;
   end crefArrayGetFirstCref;
+
+  function crefPrefixPrevious
+    input DAE.ComponentRef inCref;
+    output DAE.ComponentRef outCref;
+  end crefPrefixPrevious;
 end ComponentReference;
 
 package Expression
@@ -3006,6 +3062,11 @@ package Expression
     input DAE.Exp inExp;
     output DAE.Type outType;
   end typeof;
+
+  function isAtomic
+    input DAE.Exp inExp;
+    output Boolean outBoolean;
+  end isAtomic;
 
   function isHalf
     input DAE.Exp inExp;
@@ -3085,10 +3146,10 @@ package Expression
     output Boolean outB;
   end isMetaArray;
 
-  function getClockIntvl
+  function getClockInterval
     input DAE.ClockKind inClk;
     output DAE.Exp outIntvl;
-  end getClockIntvl;
+  end getClockInterval;
 end Expression;
 
 package ExpressionDump
@@ -3100,6 +3161,10 @@ package ExpressionDump
     input DAE.Exp e;
     output String s;
   end printCrefsFromExpStr;
+  function binopSymbol
+    input DAE.Operator inOperator;
+    output String outString;
+  end binopSymbol;
 end ExpressionDump;
 
 package Config
@@ -3172,11 +3237,14 @@ package Flags
   constant DebugFlag MODEL_INFO_JSON;
   constant DebugFlag USEMPI;
   constant DebugFlag RUNTIME_STATIC_LINKING;
+  constant DebugFlag HARDCODED_START_VALUES;
   constant ConfigFlag NUM_PROC;
   constant ConfigFlag HPCOM_CODE;
   constant ConfigFlag PROFILING_LEVEL;
   constant ConfigFlag CPP_FLAGS;
   constant ConfigFlag MATRIX_FORMAT;
+  constant DebugFlag FMU_EXPERIMENTAL;
+  constant DebugFlag MULTIRATE_PARTITION;
 
   function isSet
     input DebugFlag inFlag;

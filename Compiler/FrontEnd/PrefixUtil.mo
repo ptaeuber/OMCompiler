@@ -81,21 +81,21 @@ algorithm
 
     case Prefix.NOPRE() then "<Prefix.NOPRE()>";
     case Prefix.PREFIX(Prefix.NOCOMPPRE(),_) then "<Prefix.PREFIX(Prefix.NOCOMPPRE())>";
-    case Prefix.PREFIX(Prefix.PRE(str,_,{},Prefix.NOCOMPPRE(),_),_) then str;
-    case Prefix.PREFIX(Prefix.PRE(str,_,ss,Prefix.NOCOMPPRE(),_),_)
+    case Prefix.PREFIX(Prefix.PRE(str,_,{},Prefix.NOCOMPPRE(),_,_),_) then str;
+    case Prefix.PREFIX(Prefix.PRE(str,_,ss,Prefix.NOCOMPPRE(),_,_),_)
       equation
         s = stringAppend(str, "[" + stringDelimitList(
           List.map(ss, ExpressionDump.subscriptString), ", ") + "]");
       then
         s;
-    case Prefix.PREFIX(Prefix.PRE(str,_,{},rest,_),cp)
+    case Prefix.PREFIX(Prefix.PRE(str,_,{},rest,_,_),cp)
       equation
         rest_1 = printPrefixStr(Prefix.PREFIX(rest,cp));
         s = stringAppend(rest_1, ".");
         s_1 = stringAppend(s, str);
       then
         s_1;
-    case Prefix.PREFIX(Prefix.PRE(str,_,ss,rest,_),cp)
+    case Prefix.PREFIX(Prefix.PRE(str,_,ss,rest,_,_),cp)
       equation
         rest_1 = printPrefixStr(Prefix.PREFIX(rest,cp));
         s = stringAppend(rest_1, ".");
@@ -166,6 +166,7 @@ public function prefixAdd "This function is used to extend a prefix with another
   input Prefix.Prefix inPrefix;
   input SCode.Variability vt;
   input ClassInf.State ci_state;
+  input SourceInfo inInfo;
   output Prefix.Prefix outPrefix;
 algorithm
   outPrefix := match (inIdent,inType,inIntegerLst,inPrefix,vt,ci_state)
@@ -175,10 +176,10 @@ algorithm
       Prefix.ComponentPrefix p;
 
     case (i,_,s,Prefix.PREFIX(p,_),_,_)
-      then Prefix.PREFIX(Prefix.PRE(i,inType,s,p,ci_state),Prefix.CLASSPRE(vt));
+      then Prefix.PREFIX(Prefix.PRE(i,inType,s,p,ci_state,inInfo),Prefix.CLASSPRE(vt));
 
     case(i,_,s,Prefix.NOPRE(),_,_)
-      then Prefix.PREFIX(Prefix.PRE(i,inType,s,Prefix.NOCOMPPRE(),ci_state),Prefix.CLASSPRE(vt));
+      then Prefix.PREFIX(Prefix.PRE(i,inType,s,Prefix.NOCOMPPRE(),ci_state,inInfo),Prefix.CLASSPRE(vt));
   end match;
 end prefixAdd;
 
@@ -194,8 +195,10 @@ algorithm
       Prefix.ComponentPrefix c;
       ClassInf.State ci_state;
       list<DAE.Dimension> pdims;
-    case (Prefix.PREFIX(Prefix.PRE(prefix = a, dimensions = pdims, subscripts = b,ci_state=ci_state),cp))
-      then Prefix.PREFIX(Prefix.PRE(a,pdims,b,Prefix.NOCOMPPRE(),ci_state),cp);
+      SourceInfo info;
+
+    case (Prefix.PREFIX(Prefix.PRE(prefix = a, dimensions = pdims, subscripts = b,ci_state=ci_state, info = info),cp))
+      then Prefix.PREFIX(Prefix.PRE(a,pdims,b,Prefix.NOCOMPPRE(),ci_state,info),cp);
   end match;
 end prefixFirst;
 
@@ -684,6 +687,7 @@ algorithm
       DAE.ReductionIterators riters;
       DAE.CallAttributes attr;
       list<String> fieldNames;
+      DAE.ClockKind clk;
 
     // no prefix, return the input expression
     case (cache,_,_,e,Prefix.NOPRE())
@@ -713,15 +717,22 @@ algorithm
       equation
         (cache, crefExp) = prefixExpCref(cache, env, ih, inExp, pre);
       then
-        (cache,crefExp);
+        (cache, crefExp);
+
+    // clocks
+    case (cache, env, ih, DAE.CLKCONST(clk), pre)
+      equation
+        (cache, clk) = prefixClockKind(cache, env, ih, clk, pre);
+      then
+        (cache, DAE.CLKCONST(clk));
 
     case (cache,env,ih,(DAE.ASUB(exp = e1, sub = expl)),pre)
       equation
-        (cache,es_1) = prefixExpList(cache, env, ih, expl, pre);
-        (cache,e1) = prefixExp(cache, env, ih, e1,pre);
+        (cache, es_1) = prefixExpList(cache, env, ih, expl, pre);
+        (cache, e1) = prefixExp(cache, env, ih, e1, pre);
         e2 = Expression.makeASUB(e1,es_1);
       then
-        (cache,e2);
+        (cache, e2);
 
     case (cache,env,ih,(DAE.TSUB(e1, index_, t)),pre)
       equation
@@ -1353,6 +1364,72 @@ algorithm
     else false;
   end match;
 end isNoPrefix;
+
+public function prefixClockKind "Add the supplied prefix to the clock kind"
+  input FCore.Cache inCache;
+  input FCore.Graph inEnv;
+  input InnerOuter.InstHierarchy inIH;
+  input DAE.ClockKind inClkKind;
+  input Prefix.Prefix inPrefix;
+  output FCore.Cache outCache;
+  output DAE.ClockKind outClkKind;
+algorithm
+  (outCache, outClkKind) := match (inCache, inEnv, inIH, inClkKind, inPrefix)
+    local
+      DAE.Exp e;
+      DAE.ClockKind clkKind;
+      FCore.Cache cache;
+      FCore.Graph env;
+      InstanceHierarchy ih;
+      Prefix.Prefix p;
+      Integer resolution;
+      Real interval;
+      String method;
+
+    // clock kinds
+    case (cache, env, ih, DAE.INFERRED_CLOCK(), p)
+      then (cache, inClkKind);
+
+    case (cache, env, ih, DAE.INTEGER_CLOCK(e, resolution), p)
+      equation
+        (cache, e) = prefixExp(cache, env, ih, e, p);
+        clkKind = DAE.INTEGER_CLOCK(e, resolution);
+      then
+        (cache, clkKind);
+
+    case (cache, env, ih, DAE.REAL_CLOCK(e), p)
+      equation
+        (cache, e) = prefixExp(cache, env, ih, e, p);
+        clkKind = DAE.REAL_CLOCK(e);
+      then
+        (cache, clkKind);
+
+    case (cache, env, ih, DAE.BOOLEAN_CLOCK(e, interval), p)
+      equation
+        (cache, e) = prefixExp(cache, env, ih, e, p);
+        clkKind = DAE.BOOLEAN_CLOCK(e, interval);
+      then
+        (cache, clkKind);
+
+    case (cache, env, ih, DAE.SOLVER_CLOCK(e, method), p)
+      equation
+        (cache, e) = prefixExp(cache, env, ih, e, p);
+        clkKind = DAE.SOLVER_CLOCK(e, method);
+      then
+        (cache, clkKind);
+
+  end match;
+end prefixClockKind;
+
+public function getPrefixInfo
+  input Prefix.Prefix inPrefix;
+  output SourceInfo outInfo;
+algorithm
+  outInfo := match inPrefix
+    case Prefix.PREFIX(compPre = Prefix.PRE(info = outInfo)) then outInfo;
+    else Absyn.dummyInfo;
+  end match;
+end getPrefixInfo;
 
 annotation(__OpenModelica_Interface="frontend");
 end PrefixUtil;

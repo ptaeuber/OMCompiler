@@ -4,6 +4,10 @@
 */
 #include <Core/ModelicaDefine.h>
 #include <Core/Modelica.h>
+
+#include <Solver/Newton/FactoryExport.h>
+#include <Core/Utils/extension/logger.hpp>
+
 #include <Solver/Newton/Newton.h>
 
 #include <Core/Math/ILapack.h>        // needed for solution of linear system with Lapack
@@ -17,9 +21,9 @@ Newton::Newton(IAlgLoop* algLoop, INonLinSolverSettings* settings)
 	, _yHelp            (NULL)
 	, _f                (NULL)
 	, _fHelp            (NULL)
-	,_iHelp        (NULL)
-	, _jac                (NULL)
-	, _zeroVec            (NULL)
+	, _iHelp            (NULL)
+	, _jac              (NULL)
+	, _zeroVec          (NULL)
 	, _dimSys            (0)
 	, _firstCall        (true)
 	, _iterationStatus    (CONTINUE)
@@ -28,12 +32,12 @@ Newton::Newton(IAlgLoop* algLoop, INonLinSolverSettings* settings)
 
 Newton::~Newton()
 {
-	if(_y)         delete []    _y;
+	if(_y)        delete []    _y;
 	if(_yHelp)    delete []    _yHelp;
 	if(_f)        delete []    _f;
 	if(_fHelp)    delete []    _fHelp;
 	if(_iHelp)    delete []    _iHelp;
-	if(_jac)    delete []    _jac;
+	if(_jac)      delete []    _jac;
 	if(_zeroVec)  delete []   _zeroVec;
 
 }
@@ -266,6 +270,4 @@ void Newton::restoreNewValues()
 }
 
 
-
 /** @} */ // end of solverNewton
-

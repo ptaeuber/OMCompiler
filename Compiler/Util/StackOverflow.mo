@@ -59,12 +59,20 @@ protected
   list<String> strs;
   String so,fun;
 algorithm
+  // regex for Linux messages
   (n,strs) := System.regex(inSymbol, "^([^(]*)[(]([^+]*[^+]*)[+][^)]*[)] *[[]0x[0-9a-fA-F]*[]]$", 3, extended=true);
   if n == 3 then
     {_,so,fun} := strs;
     outSymbol := so + "(" + unmangle(fun) + ")";
   else
-    outSymbol := inSymbol;
+    // regex for OSX messages
+    (n,strs) := System.regex(inSymbol, "^[0-9 ]*([A-Za-z0-9.]*) *0x[0-9a-fA-F]* ([A-Za-z0-9_]*) *[+] *[0-9]*$", 3, extended=true);
+    if n == 3 then
+      {_,so,fun} := strs;
+      outSymbol := so + "(" + unmangle(fun) + ")";
+    else
+      outSymbol := inSymbol;
+    end if;
   end if;
 end stripAddresses;
 
@@ -102,6 +110,14 @@ function getStacktraceMessages
 <p>Returns a list of symbol names to print in error messages.</p>
 </html>"));
 end getStacktraceMessages;
+
+function setStacktraceMessages
+  input Integer numSkip;
+  input Integer numFrames;
+  external "C" mmc_setStacktraceMessages_threadData(OpenModelica.threadData(), numSkip, numFrames)annotation(Documentation(info="<html>
+<p>Generate a stacktrace at the current position of code.</p>
+</html>"));
+end setStacktraceMessages;
 
 function hasStacktraceMessages
   output Boolean b;

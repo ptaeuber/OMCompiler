@@ -33,8 +33,6 @@ encapsulated package BackendDAE
 " file:        BackendDAE.mo
   package:     BackendDAE
   description: BackendDAE contains the data-types used by the back end.
-
-  RCS: $Id$
 "
 
 public import Absyn;
@@ -245,6 +243,9 @@ uniontype VarKind "variable kind"
   record STATE_DER end STATE_DER;
   record DUMMY_DER end DUMMY_DER;
   record DUMMY_STATE end DUMMY_STATE;
+  record CLOCKED_STATE
+    .DAE.ComponentRef previousName "the name of the previous variable";
+  end CLOCKED_STATE;
   record DISCRETE end DISCRETE;
   record PARAM end PARAM;
   record CONST end CONST;
@@ -291,38 +292,13 @@ public uniontype EquationAttributes
   record EQUATION_ATTRIBUTES
     Boolean differentiated "true if the equation was differentiated, and should not differentiated again to avoid equal equations";
     EquationKind kind;
-    LoopInfo loopInfo;
   end EQUATION_ATTRIBUTES;
 end EquationAttributes;
 
-public constant EquationAttributes EQ_ATTR_DEFAULT_DYNAMIC = EQUATION_ATTRIBUTES(false, DYNAMIC_EQUATION(), NO_LOOP());
-public constant EquationAttributes EQ_ATTR_DEFAULT_BINDING = EQUATION_ATTRIBUTES(false, BINDING_EQUATION(), NO_LOOP());
-public constant EquationAttributes EQ_ATTR_DEFAULT_INITIAL = EQUATION_ATTRIBUTES(false, INITIAL_EQUATION(), NO_LOOP());
-public constant EquationAttributes EQ_ATTR_DEFAULT_UNKNOWN = EQUATION_ATTRIBUTES(false, UNKNOWN_EQUATION_KIND(), NO_LOOP());
-
-public uniontype LoopInfo "is this equation part of a for-loop"
-  record NO_LOOP
-  end NO_LOOP;
-
-  record LOOP
-    Integer loopId;
-    //Integer pos; // position in the loop, 1=start, endIt=last, needed to get the matching afterwards
-    .DAE.Exp startIt;
-    .DAE.Exp endIt;
-    list<IterCref> crefs;
-  end LOOP;
-end LoopInfo;
-
-public uniontype IterCref "which crefs occur in the for-loop and what are their iterated indexes"
-  record ITER_CREF
-    .DAE.ComponentRef cref;
-    .DAE.Exp iterator;
-  end ITER_CREF;
-    record ACCUM_ITER_CREF
-    .DAE.ComponentRef cref;
-    .DAE.Operator op; // the operator e.g. add
-  end ACCUM_ITER_CREF;
-end IterCref;
+public constant EquationAttributes EQ_ATTR_DEFAULT_DYNAMIC = EQUATION_ATTRIBUTES(false, DYNAMIC_EQUATION());
+public constant EquationAttributes EQ_ATTR_DEFAULT_BINDING = EQUATION_ATTRIBUTES(false, BINDING_EQUATION());
+public constant EquationAttributes EQ_ATTR_DEFAULT_INITIAL = EQUATION_ATTRIBUTES(false, INITIAL_EQUATION());
+public constant EquationAttributes EQ_ATTR_DEFAULT_UNKNOWN = EQUATION_ATTRIBUTES(false, UNKNOWN_EQUATION_KIND());
 
 public
 uniontype Equation
@@ -490,7 +466,7 @@ type StructurallySingularSystemHandlerArg = tuple<StateOrder,ConstraintEquations
 "StateOrder,ConstraintEqns,Eqn->EqnsIndxes,EqnIndex->Eqns,NrOfEqnsbeforeIndexReduction";
 
 public
-type ConstraintEquations = list<tuple<Integer,list<Equation>>>;
+type ConstraintEquations = array<list<Equation>>;
 
 public
 uniontype StateOrder
@@ -741,7 +717,8 @@ public
 type SparsePattern = tuple<list<tuple< .DAE.ComponentRef, list< .DAE.ComponentRef>>>, // column-wise sparse pattern
                            list<tuple< .DAE.ComponentRef, list< .DAE.ComponentRef>>>, // row-wise sparse pattern
                            tuple<list< .DAE.ComponentRef>,                            // diff vars
-                                 list< .DAE.ComponentRef>>>;                          // diffed vars
+                                 list< .DAE.ComponentRef>>,                           // diffed vars
+                           Integer>;                                                  // nonZeroElements
 
 public
 type SparseColoring = list<list< .DAE.ComponentRef>>;   // colouring
@@ -754,13 +731,13 @@ uniontype DifferentiateInputData
     Option<Variables> dependenentVars;            // Dependent variables
     Option<Variables> knownVars;                  // known variables (e.g. parameter, constants, ...)
     Option<Variables> allVars;                    // all variables
-    Option<list< Var>> controlVars;               // variables to save control vars of for algorithm
-    Option<list< .DAE.ComponentRef>> diffCrefs;   // all crefs to differentiate, needed for generic gradient
+    list< Var> controlVars;                       // variables to save control vars of for algorithm
+    list< .DAE.ComponentRef> diffCrefs;           // all crefs to differentiate, needed for generic gradient
     Option<String> matrixName;                    // name to create temporary vars, needed for generic gradient
   end DIFFINPUTDATA;
 end DifferentiateInputData;
 
-public constant DifferentiateInputData noInputData = DIFFINPUTDATA(NONE(),NONE(),NONE(),NONE(),NONE(),NONE(),NONE());
+public constant DifferentiateInputData emptyInputData = DIFFINPUTDATA(NONE(),NONE(),NONE(),NONE(),{},{},NONE());
 
 public
 type DifferentiateInputArguments = tuple< .DAE.ComponentRef, DifferentiateInputData, DifferentiationType, .DAE.FunctionTree>;

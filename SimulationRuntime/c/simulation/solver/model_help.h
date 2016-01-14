@@ -37,38 +37,40 @@ extern "C" {
 #include "simulation_data.h"
 
 /* lochel: I guess this is used for discrete relations */
-#define RELATION(res,exp1,exp2,index,op_w) { \
-  if(data->simulationInfo.initial) \
+#define RELATION(res,exp1,exp2,index,op_w) \
+{ \
+  if(data->simulationInfo->initial) \
   { \
     res = ((op_w)((exp1),(exp2))); \
-    data->simulationInfo.relations[index] = res; \
+    data->simulationInfo->relations[index] = res; \
   } \
-  else if(data->simulationInfo.discreteCall == 0 || data->simulationInfo.solveContinuous) \
+  else if(data->simulationInfo->discreteCall == 0 || data->simulationInfo->solveContinuous) \
   { \
-    res = data->simulationInfo.relationsPre[index]; \
+    res = data->simulationInfo->relationsPre[index]; \
   } \
   else \
   { \
     res = ((op_w)((exp1),(exp2))); \
-    data->simulationInfo.relations[index] = res; \
+    data->simulationInfo->relations[index] = res; \
   } \
 }
 
 /* lochel: I guess this is used for continuous relations */
-#define RELATIONHYSTERESIS(res,exp1,exp2,index,op_w) { \
-  if(data->simulationInfo.initial) \
+#define RELATIONHYSTERESIS(res,exp1,exp2,index,op_w) \
+{ \
+  if(data->simulationInfo->initial) \
   { \
     res = ((op_w)((exp1),(exp2))); \
-    data->simulationInfo.relations[index] = res; \
+    data->simulationInfo->relations[index] = res; \
   } \
-  else if(data->simulationInfo.discreteCall == 0 || data->simulationInfo.solveContinuous) \
+  else if(data->simulationInfo->discreteCall == 0 || data->simulationInfo->solveContinuous) \
   { \
-    res = data->simulationInfo.relationsPre[index]; \
+    res = data->simulationInfo->relationsPre[index]; \
   } \
   else \
   { \
-    res = ((op_w##ZC)((exp1),(exp2),data->simulationInfo.storedRelations[index])); \
-    data->simulationInfo.relations[index] = res; \
+    res = ((op_w##ZC)((exp1),(exp2),data->simulationInfo->storedRelations[index])); \
+    data->simulationInfo->relations[index] = res; \
   } \
 }
 
@@ -148,6 +150,12 @@ modelica_boolean LessZC(double a, double b, modelica_boolean);
 modelica_boolean LessEqZC(double a, double b, modelica_boolean);
 modelica_boolean GreaterZC(double a, double b, modelica_boolean);
 modelica_boolean GreaterEqZC(double a, double b, modelica_boolean);
+
+extern int measure_time_flag;
+
+void setContext(DATA* data, double* currentTime, int currentContext);
+void increaseJacContext(DATA* data);
+void unsetContext(DATA* data);
 
 #ifdef __cplusplus
 }

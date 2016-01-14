@@ -199,7 +199,7 @@ public constant Message STRUCT_SINGULAR_SYSTEM = MESSAGE(34, SYMBOLIC(), ERROR()
 public constant Message UNSUPPORTED_LANGUAGE_FEATURE = MESSAGE(35, TRANSLATION(), ERROR(),
   Util.gettext("The language feature %s is not supported. Suggested workaround: %s"));
 public constant Message NON_EXISTING_DERIVATIVE = MESSAGE(36, SYMBOLIC(), ERROR(),
-  Util.gettext("Derivative of expression %s is non-existent."));
+  Util.gettext("Derivative of expression \"%s\" w.r.t. \"%s\" is non-existent."));
 public constant Message NO_CLASSES_LOADED = MESSAGE(37, TRANSLATION(), ERROR(),
   Util.gettext("No classes are loaded."));
 public constant Message INST_PARTIAL_CLASS = MESSAGE(38, TRANSLATION(), ERROR(),
@@ -569,7 +569,7 @@ public constant Message INVALID_CLASS_RESTRICTION = MESSAGE(220, TRANSLATION(), 
 public constant Message CONNECT_IN_INITIAL_EQUATION = MESSAGE(221, TRANSLATION(), ERROR(),
   Util.gettext("Connect equations are not allowed in initial equation sections."));
 public constant Message FINAL_COMPONENT_OVERRIDE = MESSAGE(222, TRANSLATION(), ERROR(),
-  Util.gettext("Trying to override final component %s with modifier %s."));
+  Util.gettext("Trying to override final element %s with modifier '%s'."));
 public constant Message NOTIFY_NOT_LOADED = MESSAGE(223, SCRIPTING(), NOTIFICATION(),
   Util.gettext("Automatically loaded package %s %s due to uses annotation."));
 public constant Message REINIT_MUST_BE_REAL = MESSAGE(224, TRANSLATION(), ERROR(),
@@ -690,10 +690,16 @@ public constant Message RETURN_OUTSIDE_FUNCTION = MESSAGE(281, TRANSLATION(), ER
   Util.gettext("'return' may not be used outside function."));
 public constant Message EXT_LIBRARY_NOT_FOUND = MESSAGE(282, TRANSLATION(), WARNING(),
   Util.gettext("Could not find library %s in either of:%s"));
-public constant Message EXT_LIBRARY_NOT_FOUND_DESPITE_COMPILATION_SUCCESS = MESSAGE(258, TRANSLATION(), WARNING(),
+public constant Message EXT_LIBRARY_NOT_FOUND_DESPITE_COMPILATION_SUCCESS = MESSAGE(283, TRANSLATION(), WARNING(),
   Util.gettext("Could not find library %s despite compilation command %s in directory %s returning success."));
-public constant Message GENERATE_SEPARATE_CODE_DEPENDENCIES_FAILED_UNKNOWN_PACKAGE = MESSAGE(283, SCRIPTING(), ERROR(),
+public constant Message GENERATE_SEPARATE_CODE_DEPENDENCIES_FAILED_UNKNOWN_PACKAGE = MESSAGE(284, SCRIPTING(), ERROR(),
   Util.gettext("Failed to get dependencies for package %s. %s contains an import to non-existing package %s."));
+public constant Message USE_OF_PARTIAL_CLASS = MESSAGE(285, TRANSLATION(), ERROR(),
+  Util.gettext("component %s contains the definition of a partial class %s.\nPlease redeclare it to any package compatible with %s."));
+public constant Message SCANNER_ERROR = MESSAGE(286, SYNTAX(), ERROR(),
+  Util.gettext("Syntax error, unrecognized input: %s."));
+public constant Message SCANNER_ERROR_LIMIT = MESSAGE(287, SYNTAX(), ERROR(),
+  Util.gettext("Additional syntax errors were suppressed."));
 
 public constant Message UNBOUND_PARAMETER_WITH_START_VALUE_WARNING = MESSAGE(499, TRANSLATION(), WARNING(),
   Util.gettext("Parameter %s has no value, and is fixed during initialization (fixed=true), using available start value (start=%s) as default value."));
@@ -705,8 +711,6 @@ public constant Message SETTING_FIXED_ATTRIBUTE = MESSAGE(503, TRANSLATION(), WA
   Util.gettext("Using over-determined solver for initialization. Setting fixed=false to the following variables: %s."));
 public constant Message FAILED_TO_EVALUATE_FUNCTION = MESSAGE(506, TRANSLATION(), ERROR(),
   Util.gettext("Failed to evaluate function: %s."));
-public constant Message FINAL_OVERRIDE = MESSAGE(508, TRANSLATION(), ERROR(),
-  Util.gettext("Trying to override final variable in component %s and scope %s by using modifiers: %s and %s that do not agree."));
 public constant Message WARNING_RELATION_ON_REAL = MESSAGE(509, TRANSLATION(), WARNING(),
   Util.gettext("In component %s, in relation %s, %s on Real numbers is only allowed inside functions."));
 public constant Message OUTER_MODIFICATION = MESSAGE(512, TRANSLATION(), WARNING(),
@@ -716,7 +720,7 @@ public constant Message DERIVATIVE_NON_REAL = MESSAGE(514, TRANSLATION(), ERROR(
 public constant Message UNUSED_MODIFIER = MESSAGE(515, TRANSLATION(), ERROR(),
   Util.gettext("In modifier %s."));
 public constant Message MULTIPLE_MODIFIER = MESSAGE(516, TRANSLATION(), ERROR(),
-  Util.gettext("Multiple modifiers in same scope for element %s, %s."));
+  Util.gettext("Multiple modifiers in same scope for element %s."));
 public constant Message INCONSISTENT_UNITS = MESSAGE(517, TRANSLATION(), WARNING(),
   Util.gettext("The system of units is inconsistent in term %s with the units %s and %s respectively."));
 public constant Message CONSISTENT_UNITS = MESSAGE(518, TRANSLATION(), NOTIFICATION(),
@@ -732,7 +736,7 @@ public constant Message WARNING_JACOBIAN_EQUATION_SOLVE = MESSAGE(523, SYMBOLIC(
 public constant Message SIMPLIFICATION_COMPLEXITY = MESSAGE(523, SYMBOLIC(), NOTIFICATION(),
   Util.gettext("Simplification produced a higher complexity (%s) than the original (%s). The simplification was: %s => %s."));
 public constant Message ITERATOR_NON_ARRAY = MESSAGE(524, TRANSLATION(), ERROR(),
-  Util.gettext("Iterator %s, has type %s, but expected an array expression."));
+  Util.gettext("Iterator %s, has type %s, but expected a 1D array expression."));
 public constant Message INST_INVALID_RESTRICTION = MESSAGE(525, TRANSLATION(), ERROR(),
   Util.gettext("Cannot instantiate %s due to class specialization %s."));
 public constant Message INST_NON_LOADED = MESSAGE(526, TRANSLATION(), WARNING(),
@@ -782,7 +786,7 @@ public constant Message NON_STANDARD_OPERATOR = MESSAGE(547, TRANSLATION(), WARN
 public constant Message CONNECT_ARRAY_SIZE_ZERO = MESSAGE(548, TRANSLATION(), WARNING(),
   Util.gettext("Ignoring connection of array components having size zero: %s and %s."));
 public constant Message ILLEGAL_RECORD_COMPONENT = MESSAGE(549, TRANSLATION(), ERROR(),
-  Util.gettext("Ignoring record component:\n%swhen building record the constructor. Records are allowed to contain only components of basic types, arrays of basic types or other records."));
+  Util.gettext("Ignoring record component:\n%swhen building the record constructor. Records are allowed to contain only components of basic types, arrays of basic types or other records."));
 public constant Message EQ_WITHOUT_TIME_DEP_VARS = MESSAGE(550, SYMBOLIC(), ERROR(),
   Util.gettext("Found equation without time-dependent variables: %s = %s"));
 public constant Message OVERCONSTRAINED_OPERATOR_SIZE_ZERO = MESSAGE(551, TRANSLATION(), WARNING(),

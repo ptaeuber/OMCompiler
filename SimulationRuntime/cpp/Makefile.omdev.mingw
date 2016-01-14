@@ -7,66 +7,160 @@ builddir_build=$(OMBUILDDIR)
 builddir_bin=$(OMBUILDDIR)/bin
 builddir_lib=$(OMBUILDDIR)/lib/omc
 builddir_inc=$(OMBUILDDIR)/include/omc
+ifeq ($(VSVERSION),)
+VSVERSION = 2010
+endif
+VSCOMNTOOLS = $(VS140COMNTOOLS)
 
 #use this call to use precompiled headers
-#BUILDTYPE = Release
 #use this call if you want to debug the cpp runtime
+CMAKE = $(OMDEV)/bin/cmake/bin/cmake -DCMAKE_VERBOSE_MAKEFILE:Bool=ON
+
+ifeq ($(BUILDTYPE),)
+	BUILDTYPE=Debug
+endif
+
 ifeq ($(BUILDTYPE),)
 BUILDTYPE=Debug
 endif
 
-CMAKE = $(OMDEV)/bin/cmake/bin/cmake -DCMAKE_VERBOSE_MAKEFILE:Bool=ON
+
+
+BOOST_STATIC_LINKING="false"
+ifeq ("$(BOOST_STATIC_LINKING)","true")
+	BOOST_STATIC_LINKING_COMMAND=-DBOOST_STATIC_LINKING=ON
+else
+	BOOST_STATIC_LINKING_COMMAND=-DBOOST_STATIC_LINKING=OFF
+endif
+
+BOOST_REALPATHS="false"
+ifeq ("$(BOOST_REALPATHS)","true")
+	BOOST_REALPATHS_COMMAND=-DUSE_BOOST_REALPATHS=ON
+else
+	BOOST_REALPATHS_COMMAND=-DUSE_BOOST_REALPATHS=OFF
+endif
+
+RUNTIME_PROFILING="false"
+ifeq ("$(RUNTIME_PROFILING)","true")
+	RUNTIME_PROFILING_COMMAND=-DRUNTIME_PROFILING=ON
+else
+	RUNTIME_PROFILING_COMMAND=-DRUNTIME_PROFILING=OFF
+endif
+
+SCOREP="false"
+ifeq ("$(SCOREP)","true")
+	USE_SCOREP_COMMAND=-DUSE_SCOREP=ON
+else
+	USE_SCOREP_COMMAND=-DUSE_SCOREP=OFF
+endif
+
+SCOREP_HOME=""
+SCOREP_HOME_COMMAND=-DSCOREP_HOME=$(SCOREP_HOME)
+
+FMU_SUNDIALS="false"
+ifeq ("$(FMU_SUNDIALS)","true")
+	FMU_SUNDIALS_COMMAND=-DFMU_SUNDIALS=ON
+else
+	FMU_SUNDIALS_COMMAND=-DFMU_SUNDIALS=OFF
+endif
+
+PARALLEL_OUTPUT="false"
+ifeq ("$(PARALLEL_OUTPUT)","true")
+	PARALLEL_OUTPUT_COMMAND=-DUSE_PARALLEL_OUTPUT=ON
+else
+	PARALLEL_OUTPUT_COMMAND=-DUSE_PARALLEL_OUTPUT=OFF
+endif
+
+USE_LOGGER="false"
+ifeq ("$(USE_LOGGER)","true")
+	USE_LOGGER_COMMAND=-DUSE_LOGGER=ON
+else
+	USE_LOGGER_COMMAND=-DUSE_LOGGER=OFF
+endif
+
+getMSVCversion:
+ifeq ("$(VSVERSION)","")
+	ifeq ("$(VS140COMNTOOLS)", "") #check VS 2015
+		ifeq ("$(VS120COMNTOOLS)", "") #check VS 2013
+			ifeq ("$(VS110COMNTOOLS)", "") #check VS 2012
+				ifeq ("$(VS100COMNTOOLS)", "") #check VS 2010
+					echo "Could not identify Visual Studio version"
+				else
+					$(eval VSCOMNTOOLS=$(VS100COMNTOOLS))
+				endif
+			else
+				$(eval VSCOMNTOOLS=$(VS110COMNTOOLS))
+			endif
+		else
+			$(eval VSCOMNTOOLS=$(VS120COMNTOOLS))
+		endif
+	endif
+else
+ifeq ($(VSVERSION),2010)
+	$(eval VSCOMNTOOLS=$(VS100COMNTOOLS))
+else
+ifeq ($(VSVERSION),2012)
+	$(eval VSCOMNTOOLS=$(VS110COMNTOOLS))
+else
+ifeq ($(VSVERSION),2013)
+	$(eval VSCOMNTOOLS=$(VS120COMNTOOLS))
+else
+ifeq ($(VSVERSION),2015)
+	$(eval VSCOMNTOOLS=$(VS140COMNTOOLS))
+endif
+endif
+endif
+endif
+endif
+
 
 runtimeCpp:
 	mkdir -p Build
 	cd ./Build; echo "change to Build";	\
-	$(CMAKE) -G "MSYS Makefiles" -D CMAKE_BUILD_TYPE=$(BUILDTYPE) -D CMAKE_INSTALL_PREFIX:PATH="$(OMBUILDDIR)" MAKE_CXX_COMPILER=g++ ../; \
+	$(CMAKE) -G "MSYS Makefiles" -DCMAKE_BUILD_TYPE=$(BUILDTYPE) -DCMAKE_INSTALL_PREFIX:PATH="$(OMBUILDDIR)" $(BOOST_STATIC_LINKING_COMMAND) $(BOOST_REALPATHS_COMMAND) $(RUNTIME_PROFILING_COMMAND) $(USE_SCOREP_COMMAND) $(SCOREP_HOME_COMMAND) $(FMU_SUNDIALS_COMMAND) $(PARALLEL_OUTPUT_COMMAND) $(USE_LOGGER_COMMAND) MAKE_CXX_COMPILER=g++ ../; \
 	make;
 
-runtimeCPPmsvc:
-	test -f """${VS100COMNTOOLS}/../../VC/vcvarsall.bat"""
+runtimeCPPmsvc: getMSVCversion
+	test -f """${VSCOMNTOOLS}/../../VC/vcvarsall.bat"""
 	echo 'Build the cppRuntime with MSVC'
-	#rm -rf build_msvc
-	mkdir -p build_msvc
-	echo call '"%VS100COMNTOOLS%\\..\\..\\VC\\vcvarsall.bat"' > build_msvc/build.bat
-	#echo '%OMDEV%\\bin\\cmake\\bin\\cmake -DCMAKE_VERBOSE_MAKEFILE:Bool=ON -DCMAKE_BUILD_TYPE=$(BUILDTYPE) -DCMAKE_INSTALL_PREFIX=./tmp ../ -G "Visual Studio 10"' >> build_msvc/build.bat
-ifeq ($(BUILDTYPE),Debug)
-	echo echo Running CMake from '%OMDEV%\\bin\\cmake\\bin\\cmake' >> build_msvc/build.bat
-	echo '%OMDEV%\\bin\\cmake\\bin\\cmake -DCMAKE_VERBOSE_MAKEFILE:Bool=ON -DCMAKE_BUILD_TYPE=$(BUILDTYPE) -DCMAKE_INSTALL_PREFIX=./tmp ../ -G  "NMake Makefiles"' >> build_msvc/build.bat
-else
-	echo '%OMDEV%\\bin\\cmake\\bin\\cmake -DCMAKE_VERBOSE_MAKEFILE:Bool=ON -DCMAKE_BUILD_TYPE=$(BUILDTYPE) -DCMAKE_INSTALL_PREFIX=./tmp ../ -G  "NMake Makefiles"' >> build_msvc/build.bat
-endif
+	#rm -rf Build_MSVC
+	mkdir -p Build_MSVC
+	echo call '"${VSCOMNTOOLS}\\..\\..\\VC\\vcvarsall.bat"' > Build_MSVC/build.bat
+
+	echo echo Running CMake from '%OMDEV%\\bin\\cmake\\bin\\cmake' >> Build_MSVC/build.bat
+	echo '%OMDEV%\\bin\\cmake\\bin\\cmake -DCMAKE_VERBOSE_MAKEFILE:Bool=ON -DCMAKE_BUILD_TYPE=$(BUILDTYPE) $(BOOST_STATIC_LINKING_COMMAND) $(BOOST_REALPATHS_COMMAND) $(RUNTIME_PROFILING_COMMAND) $(USE_SCOREP_COMMAND) $(SCOREP_HOME_COMMAND) $(FMU_SUNDIALS_COMMAND) $(PARALLEL_OUTPUT_COMMAND) $(USE_LOGGER_COMMAND) -DCMAKE_INSTALL_PREFIX=./tmp ../ -G "NMake Makefiles JOM" -D"CMAKE_MAKE_PROGRAM:PATH=%OMDEV%\\tools\\jom\\jom.exe"' >> Build_MSVC/build.bat
+
 	# for some reason, the environment variable 'MAKEFLAGS' was set to 'w' on my and Niklas' machine?!
-	echo set MAKEFLAGS="" >> build_msvc/build.bat
-	echo echo Running NMake >> build_msvc/build.bat
-	echo nmake /f Makefile install >> build_msvc/build.bat
-	cd ./build_msvc; echo "change to build_msvc";\
+	echo set MAKEFLAGS="" >> Build_MSVC/build.bat
+	echo echo Running NMake JOM >> Build_MSVC/build.bat
+	echo %OMDEV%\\tools\\jom\\jom.exe /f Makefile install >> Build_MSVC/build.bat
+	cd ./Build_MSVC; echo "change to Build_MSVC";\
 	cmd /c build.bat
 
 	# move msvc libs into subfolder
-	mkdir -p build_msvc/tmp/lib/omc/cpp/msvc
-	mv build_msvc/tmp/lib/omc/cpp/*.dll build_msvc/tmp/lib/omc/cpp/msvc
-	mv build_msvc/tmp/lib/omc/cpp/*.lib build_msvc/tmp/lib/omc/cpp/msvc
+	mkdir -p Build_MSVC/tmp/lib/omc/cpp/msvc
+	mv Build_MSVC/tmp/lib/omc/cpp/*.dll Build_MSVC/tmp/lib/omc/cpp/msvc
+	mv Build_MSVC/tmp/lib/omc/cpp/*.lib Build_MSVC/tmp/lib/omc/cpp/msvc
 
 
 	# copy pdb files
 ifneq ($(BUILDTYPE),Release)
-	cp -u build_msvc/Solver/Newton/*.pdb build_msvc/tmp/lib/omc/cpp/msvc
-	cp -u build_msvc/Solver/Euler/*.pdb build_msvc/tmp/lib/omc/cpp/msvc
-	cp -u build_msvc/Core/SimController/*.pdb build_msvc/tmp/lib/omc/cpp/msvc
-	cp -u build_msvc/Core/Modelica/*.pdb build_msvc/tmp/lib/omc/cpp/msvc
-	#cp -u build_msvc/Core/ModelicaExternalC/*.pdb build_msvc/tmp/lib/omc/cpp/msvc
-	cp -u build_msvc/Core/SimulationSettings/*.pdb build_msvc/tmp/lib/omc/cpp/msvc
-	cp -u build_msvc/Core/Solver/*.pdb build_msvc/tmp/lib/omc/cpp/msvc
-	cp -u build_msvc/Core/System/*.pdb build_msvc/tmp/lib/omc/cpp/msvc
-	#cp -u build_msvc/SimCoreFactory/OMCFactory/*.pdb build_msvc/tmp/lib/omc/cpp/msvc
-	cp -u build_msvc/Core/DataExchange/*.pdb build_msvc/tmp/lib/omc/cpp/msvc
-	#cp -u build_msvc/Core/Math/*.pdb build_msvc/tmp/lib/omc/cpp/msvc
+	cp -u Build_MSVC/Solver/Newton/*.pdb Build_MSVC/tmp/lib/omc/cpp/msvc
+	cp -u Build_MSVC/Solver/Euler/*.pdb Build_MSVC/tmp/lib/omc/cpp/msvc
+	cp -u Build_MSVC/Core/SimController/*.pdb Build_MSVC/tmp/lib/omc/cpp/msvc
+	cp -u Build_MSVC/Core/Modelica/*.pdb Build_MSVC/tmp/lib/omc/cpp/msvc
+	#cp -u Build_MSVC/Core/ModelicaExternalC/*.pdb Build_MSVC/tmp/lib/omc/cpp/msvc
+	cp -u Build_MSVC/Core/SimulationSettings/*.pdb Build_MSVC/tmp/lib/omc/cpp/msvc
+	cp -u Build_MSVC/Core/Solver/*.pdb Build_MSVC/tmp/lib/omc/cpp/msvc
+	cp -u Build_MSVC/Core/System/*.pdb Build_MSVC/tmp/lib/omc/cpp/msvc
+	#cp -u Build_MSVC/SimCoreFactory/OMCFactory/*.pdb Build_MSVC/tmp/lib/omc/cpp/msvc
+	cp -u Build_MSVC/Core/DataExchange/*.pdb Build_MSVC/tmp/lib/omc/cpp/msvc
+	#cp -u Build_MSVC/Core/Math/*.pdb Build_MSVC/tmp/lib/omc/cpp/msvc
 endif
 
 
 	# move folder to build dir
-	cp -R build_msvc/tmp/* $(builddir_build)
+	cp -R Build_MSVC/tmp/* $(builddir_build)
 
 
 install: runtimeCpp
