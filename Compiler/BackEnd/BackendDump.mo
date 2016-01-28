@@ -3392,7 +3392,7 @@ protected
   Real density;
 algorithm
   (sz,others,nnz) := inTpl;
-  density := realDiv(realMul(100.0,intReal(nnz)),realMul(intReal(sz),intReal(sz)));
+  density := if nnz == 0 then 0.0 else realDiv(realMul(100.0,intReal(nnz)),realMul(intReal(sz),intReal(sz)));
   str := System.snprintff("%.1f",20,density);
   str := "(" + intString(sz) + "," + str + "%)" + " " + intString(others);
 end sizeNumNonZeroTornTplString;
