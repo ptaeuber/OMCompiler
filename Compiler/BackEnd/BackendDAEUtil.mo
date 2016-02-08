@@ -4642,7 +4642,7 @@ algorithm
         cr1 = ComponentReference.crefPrefixDer(cr);
         e = Expression.crefExp(cr);
         ((e,_)) = Expression.replaceExp(Expression.expSub(e1,e2), DAE.CALL(Absyn.IDENT("der"),{e},DAE.callAttrBuiltinReal), Expression.crefExp(cr1));
-        (e_derAlias,_) = Expression.traverseExpBottomUp(e, replaceDerCall, vars);
+        e_derAlias = Expression.traverseExpDummy(e, replaceDerCall);
         (de,solved,derived) = tryToSolveOrDerive(e_derAlias, cr1, NONE(),trytosolve);
         if not solved then
           (de,_) = ExpressionSimplify.simplify(de);
@@ -4668,7 +4668,7 @@ algorithm
         // de/dvar
         BackendDAE.VAR(varName=cr) = BackendVariable.getVarAt(vars, rabs);
         e = Expression.expSub(e1,e2);
-        (e_derAlias,_) = Expression.traverseExpBottomUp(e, replaceDerCall, vars);
+        e_derAlias = Expression.traverseExpDummy(e, replaceDerCall);
         (de,solved,derived) = tryToSolveOrDerive(e_derAlias, cr, NONE(),trytosolve);
         if not solved then
           (de,_) = ExpressionSimplify.simplify(de);
@@ -4697,35 +4697,30 @@ end adjacencyRowEnhanced1;
 protected function replaceDerCall "
   replaces der-calls in expression with alias-variable"
   input DAE.Exp inExp;
-  input BackendDAE.Variables vars;
   output DAE.Exp outExp;
-  output BackendDAE.Variables outVars;
 algorithm
-  (outExp,outVars) := matchcontinue (inExp, vars)
+  (outExp) := matchcontinue (inExp)
     local
-      DAE.ComponentRef cr,cref;
+      DAE.ComponentRef cr;
       DAE.Type ty;
       String str;
-      BackendDAE.Var v, v1;
+      BackendDAE.Var v;
       list<DAE.Exp> expLst;
 
-    case (DAE.CALL(path=Absyn.IDENT(name="der"), expLst={DAE.CREF(componentRef=cr, ty=ty)}), _)
+    case (DAE.CALL(path=Absyn.IDENT(name="der"), expLst={DAE.CREF(componentRef=cr, ty=ty)}))
       equation
-        ({v}, _) = BackendVariable.getVar(cr, vars);
-        cref = BackendVariable.varCref(v);
-        v1 = BackendVariable.createAliasDerVar(cref);
-        v1 = BackendVariable.mergeNominalAttribute(v, v1, false);
-        cref = BackendVariable.varCref(v1);
-        outExp = DAE.CREF(cref,ty);
-     then (outExp,vars);
+        v = BackendVariable.createAliasDerVar(cr);
+        cr = BackendVariable.varCref(v);
+        outExp = DAE.CREF(cr,ty);
+     then (outExp);
 
-    case (DAE.CALL(path=Absyn.IDENT(name="der")), _)
+    case (DAE.CALL(path=Absyn.IDENT(name="der")))
       equation
         str = "BackendDAEUtil.replaceDerCall failed for: " + ExpressionDump.printExpStr(inExp) + "\n";
         Error.addMessage(Error.INTERNAL_ERROR, {str});
      then fail();
 
-    else (inExp,vars);
+    else (inExp);
   end matchcontinue;
 end replaceDerCall;
 
