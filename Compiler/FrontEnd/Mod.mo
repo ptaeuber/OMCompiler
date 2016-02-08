@@ -1668,11 +1668,16 @@ algorithm
       list<DAE.SubMod> submods;
       DAE.SubMod submod;
 
-    // Redeclaring the same component.
+    // Redeclaration of component with no constraining class on the inner modifier.
+    case (DAE.REDECL(element = SCode.COMPONENT()),
+          DAE.REDECL(element = SCode.COMPONENT(prefixes =
+            SCode.PREFIXES(replaceablePrefix = SCode.REPLACEABLE(cc = NONE())))))
+      then inModOuter;
+
+    // Redeclaration of component with constraining class on the inner modifier.
     case (DAE.REDECL(element = el1 as SCode.COMPONENT(), mod = emod1),
           DAE.REDECL(element = el2 as SCode.COMPONENT(), mod = emod2))
       algorithm
-        true := el1.name == el2.name;
         smod1 := SCodeUtil.getConstrainedByModifiers(el1.prefixes);
         smod1 := SCode.mergeModifiers(el1.modifications, smod1);
         dmod1 := elabUntypedMod(smod1, COMPONENT(el1.name));
@@ -1693,11 +1698,16 @@ algorithm
       then
         outMod;
 
-    // Redeclaring the same class.
+    // Redeclaration of class with no constraining class on the inner modifier.
+    case (DAE.REDECL(element = SCode.CLASS()),
+          DAE.REDECL(element = SCode.CLASS(prefixes =
+            SCode.PREFIXES(replaceablePrefix = SCode.REPLACEABLE(cc = NONE())))))
+      then inModOuter;
+
+    // Redeclaration of class with constraining class on the inner modifier.
     case (DAE.REDECL(element = el1 as SCode.CLASS(), mod = emod1),
           DAE.REDECL(element = el2 as SCode.CLASS(), mod = emod2))
       algorithm
-        true := el1.name == el2.name;
         smod1 := SCodeUtil.getConstrainedByModifiers(el1.prefixes);
         dmod1 := elabUntypedMod(smod1, COMPONENT(el1.name));
         emod1 := merge(emod1, dmod1, el1.name, inCheckFinal);
@@ -1717,15 +1727,6 @@ algorithm
         outMod.mod := emod;
       then
         outMod;
-
-    // Two identical redeclares, return one of them.
-    case (DAE.REDECL(), DAE.REDECL())
-      algorithm
-        true := SCode.eachEqual(outMod.eachPrefix, inModInner.eachPrefix);
-        true := SCode.finalEqual(outMod.finalPrefix, inModInner.finalPrefix);
-        true := SCode.elementEqual(inModInner.element, outMod.element);
-      then
-        inModOuter;
 
     case (DAE.REDECL(element = el1, mod = emod),
           DAE.MOD())
@@ -2068,7 +2069,7 @@ public function subModEqual "Returns true if two submod are equal."
   input DAE.SubMod subMod2;
   output Boolean equal;
 algorithm
-  equal := matchcontinue(subMod1,subMod2)
+  equal := match(subMod1,subMod2)
     local
       DAE.Ident id1,id2;
       DAE.Mod mod1,mod2;
@@ -2076,16 +2077,13 @@ algorithm
       list<Integer> indx1,indx2;
       list<Boolean> blst1;
 
-    case (DAE.NAMEMOD(id1,mod1),DAE.NAMEMOD(id2,mod2))
-      equation
-        true = stringEq(id1,id2);
-        true = modEqual(mod1,mod2);
+    case (DAE.NAMEMOD(id1,mod1),DAE.NAMEMOD(id2,mod2)) guard stringEq(id1,id2) and modEqual(mod1,mod2)
       then
         true;
 
     // otherwise false
     else false;
-  end matchcontinue;
+  end match;
 end subModEqual;
 
 protected function valEqual
@@ -2418,16 +2416,14 @@ public function renameNamedSubMod
   input String newIdent;
   output DAE.SubMod outMod;
 algorithm
-  outMod := matchcontinue (submod,oldIdent,newIdent)
+  outMod := match (submod,oldIdent,newIdent)
     local
       DAE.Mod mod;
       String id;
-    case (DAE.NAMEMOD(id,mod),_,_)
-      equation
-        true = stringEq(id,oldIdent);
+    case (DAE.NAMEMOD(id,mod),_,_) guard stringEq(id,oldIdent)
       then DAE.NAMEMOD(newIdent,mod);
     else submod;
-  end matchcontinue;
+  end match;
 end renameNamedSubMod;
 
 public function emptyModOrEquality
@@ -2774,7 +2770,7 @@ helper function for removeFirstSubsRedecl"
   input list<SubMod> isubs;
   output list<SubMod> osubs;
 algorithm
-  osubs := matchcontinue(isubs)
+  osubs := match(isubs)
     local
       SubMod sm;
       String s;
@@ -2787,7 +2783,7 @@ algorithm
         osubs = removeRedecl(subs);
       then
         sm::osubs;
-  end matchcontinue;
+  end match;
 end removeRedecl;
 
 public function removeModList "

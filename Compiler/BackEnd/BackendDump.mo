@@ -2167,6 +2167,7 @@ algorithm
     case BackendDAE.JAC_CONSTANT() then "Jacobian Constant";
     case BackendDAE.JAC_LINEAR() then "Jacobian Linear";
     case BackendDAE.JAC_NONLINEAR() then "Jacobian Nonlinear";
+    case BackendDAE.JAC_GENERIC() then "Generic Jacobian via directional derivatives";
     case BackendDAE.JAC_NO_ANALYTIC() then "No analytic jacobian";
   end match;
 end jacobianTypeStr;
@@ -2193,7 +2194,7 @@ algorithm
     equation
       ((dae,_,_,_,_)) = sJac;
       s = "GENERIC JACOBIAN:\n";
-      dumpBackendDAE(dae,"Jacobian System");
+      dumpBackendDAE(dae,"Directional Derivatives System");
     then s;
   case(BackendDAE.EMPTY_JACOBIAN())
     equation

@@ -1560,6 +1560,8 @@ algorithm
       print(String(depth) + " merged tree size: " + String(stringLength(DiffAlgorithm.printActual(res, SimpleModelicaParser.parseTreeNodeStr))) + "\n");
       print(String(depth) + " before top="+firstTokenDebugStr(before)+"\n");
       print(" before all="+parseTreeStr(before)+"\n");
+      print(" middle all="+parseTreeStr(middle)+"\n");
+      print(" after all="+parseTreeStr(after)+"\n");
       print("middle top="+firstTokenDebugStr(middle)+"\n");
       print("after top="+firstTokenDebugStr(after)+"\n");
       print("added top="+firstTokenDebugStr(addedTree::{})+"\n");
@@ -1582,7 +1584,15 @@ algorithm
   else
     // print(DiffAlgorithm.printDiffXml(res, parseTreeNodeStr) + "\n");
   end if;
+  if debug then
+    print("Before filter WS\n");
+    print(DiffAlgorithm.printDiffXml(res, parseTreeNodeStr) + "\n");
+  end if;
   res := filterDiffWhitespace(res);
+  if debug then
+    print("After filter WS\n");
+    print(DiffAlgorithm.printDiffXml(res, parseTreeNodeStr) + "\n");
+  end if;
   if depth==1 then
     // print(DiffAlgorithm.printDiffTerminalColor(res, parseTreeNodeStr) + "\n");
   end if;
@@ -1628,17 +1638,17 @@ algorithm
     diffLocal := match diffLocal
       // Do not delete whitespace in-between two tokens
       case ((Diff.Delete, tree)::(diffLocal as ((Diff.Equal,_)::_)))
-        guard if firstIter then min(parseTreeIsWhitespaceOrPar(t) for t in tree) else false
+        guard if firstIter then min(parseTreeIsWhitespaceOrParNotComment(t) for t in tree) else false
         algorithm
           diff := (Diff.Equal, tree)::diff;
         then diffLocal;
       case ((diff1 as (Diff.Equal,_))::(Diff.Delete, tree)::(diffLocal as ((Diff.Equal,_)::_)))
-        guard min(parseTreeIsWhitespaceOrPar(t) for t in tree)
+        guard min(parseTreeIsWhitespaceOrParNotComment(t) for t in tree)
         algorithm
           diff := (Diff.Equal, tree)::diff1::diff;
         then diffLocal;
       case ((diff1 as (Diff.Equal,_))::(Diff.Delete, tree)::{})
-        guard min(parseTreeIsWhitespaceOrPar(t) for t in tree)
+        guard min(parseTreeIsWhitespaceOrParNotComment(t) for t in tree)
         algorithm
           diff := (Diff.Equal, tree)::diff1::diff;
         then diffLocal;
@@ -1651,12 +1661,12 @@ algorithm
         algorithm
           diff := diff1::diff;
         then (Diff.Delete, tree)::diffLocal;
-      // Do not add whitespace for no good reason
+      // Do not add whitespace for no good reason. Do add whitespace.
       case ((Diff.Add, tree)::(diffLocal as ((Diff.Equal,_)::_)))
-        guard if firstIter then min(parseTreeIsWhitespaceOrPar(t) for t in tree) else false
+        guard if firstIter then min(parseTreeIsWhitespaceOrParNotComment(t) for t in tree) else false
         then diffLocal;
       case ((diff1 as (Diff.Equal,_))::(Diff.Add, tree)::(diffLocal as ((Diff.Equal,_)::_)))
-        guard min(parseTreeIsWhitespaceOrPar(t) for t in tree)
+        guard min(parseTreeIsWhitespaceOrParNotComment(t) for t in tree)
         algorithm
           diff := diff1::diff;
         then diffLocal;
@@ -1741,7 +1751,9 @@ algorithm
           hasAddedWS := false;
           for t in tree loop
             _ := match (diffEnum, firstNTokensInTree_reverse(t, 2))
-              case (Diff.Equal, _) then ();
+              case (Diff.Equal, _)
+                algorithm
+                then ();
               case (_, {LexerModelicaDiff.TOKEN(id=TokenId.WHITESPACE, length=length),tok as LexerModelicaDiff.TOKEN(id=TokenId.NEWLINE)})
                 algorithm
                   treeLocal := replaceFirstTokensInTree(t, {tok,makeToken(TokenId.WHITESPACE, indentationStr)})::treeLocal;
@@ -1749,14 +1761,17 @@ algorithm
                 then ();
               case (_, {LexerModelicaDiff.TOKEN(id=TokenId.WHITESPACE, length=length)}) guard lastTokenNewline
                 algorithm
-                  replaceFirstTokensInTree(t, {makeToken(TokenId.WHITESPACE, indentationStr)});
+                  treeLocal := replaceFirstTokensInTree(t, {makeToken(TokenId.WHITESPACE, indentationStr)})::treeLocal;
                   hasAddedWS := true;
                 then ();
-              else ();
+              else
+                algorithm
+                  treeLocal := t::treeLocal;
+                then ();
             end match;
             lastTokenNewline := match lastToken(t) case LexerModelicaDiff.TOKEN(id=TokenId.NEWLINE) then true; else false; end match;
           end for;
-          diffLocal := if hasAddedWS then (diffEnum, listReverse(treeLocal))::diffLocal else d::diffLocal;
+          diffLocal := if hasAddedWS then ((diffEnum, listReverse(treeLocal))::diffLocal) else (d::diffLocal);
         then ();
     end match;
   end for;
@@ -1834,21 +1849,26 @@ function parseTreeEq
   input array<Token> diffSubtreeWorkArray1, diffSubtreeWorkArray2;
   output Boolean b;
 protected
-  Integer len1, len2;
+  Integer len1, len2, commentLen1, commentLen2;
 algorithm
   // try
-    len1 := findTokens(t1, diffSubtreeWorkArray1);
-    len2 := findTokens(t2, diffSubtreeWorkArray2);
+    (len1,commentLen1) := findTokens(t1, diffSubtreeWorkArray1);
+    (len2,commentLen2) := findTokens(t2, diffSubtreeWorkArray2);
   /*else
     print("parseTreeEq failed: t1=" + parseTreeStr({t1}) + "\n");
     print("parseTreeEq failed: t2=" + parseTreeStr({t2}) + "\n");
   end try;*/
   b := false;
-  if len1 <> len2 then
+  if len1 <> len2 or commentLen1 <> commentLen2 then
     return;
   end if;
   for i in 1:len1 loop
     if not modelicaDiffTokenEq(diffSubtreeWorkArray1[i], diffSubtreeWorkArray2[i]) then
+      return;
+    end if;
+  end for;
+  for i in 1:commentLen1 loop
+    if not modelicaDiffTokenEq(diffSubtreeWorkArray1[arrayLength(diffSubtreeWorkArray1)-(i-1)], diffSubtreeWorkArray2[arrayLength(diffSubtreeWorkArray2)-(i-1)]) then
       return;
     end if;
   end for;
@@ -1859,9 +1879,15 @@ function findTokens
   input ParseTree t;
   input array<Token> work;
   input Integer inCount=0;
+  input Integer inCommentCount=0;
   output Integer count=inCount;
+  output Integer commentCount=inCommentCount;
 algorithm
-  if parseTreeIsWhitespaceOrPar(t) then
+  if parseTreeIsComment(t) then
+    arrayUpdate(work, arrayLength(work)-commentCount, firstTokenInTree(t));
+    commentCount := commentCount + 1;
+    return;
+  elseif parseTreeIsWhitespaceOrPar(t) then
     return;
   end if;
   _ := match t
@@ -1874,7 +1900,7 @@ algorithm
     case NODE()
       algorithm
         for n in t.nodes loop
-          count := findTokens(n, work, count);
+          (count, commentCount) := findTokens(n, work, count, commentCount);
         end for;
       then ();
   end match;
@@ -2213,6 +2239,16 @@ constant list<TokenId> whiteSpaceTokenIds = {
     TokenId.WHITESPACE
 };
 
+constant list<TokenId> whiteSpaceTokenIdsNotComment = {
+    TokenId.NEWLINE,
+    TokenId.WHITESPACE
+};
+
+constant list<TokenId> tokenIdsComment = {
+    TokenId.LINE_COMMENT,
+    TokenId.BLOCK_COMMENT
+};
+
 function dummyParseTreeIsWhitespaceFalse
   // The diff-algorithm will strip leading whitespace, but these are
   // sort of significant...
@@ -2243,6 +2279,30 @@ algorithm
     else false;
   end match;
 end parseTreeIsWhitespaceOrPar;
+
+function parseTreeIsWhitespaceOrParNotComment
+  input ParseTree t1;
+  output Boolean b;
+protected
+  TokenId id;
+algorithm
+  b := match t1
+    case LEAF() then listMember(t1.token.id, TokenId.LPAR::TokenId.RPAR::whiteSpaceTokenIdsNotComment);
+    else false;
+  end match;
+end parseTreeIsWhitespaceOrParNotComment;
+
+function parseTreeIsComment
+  input ParseTree t1;
+  output Boolean b;
+protected
+  TokenId id;
+algorithm
+  b := match t1
+    case LEAF() then listMember(t1.token.id, tokenIdsComment);
+    else false;
+  end match;
+end parseTreeIsComment;
 
 function eatWhitespace
   extends partialParser;
@@ -2424,6 +2484,7 @@ protected
   Integer i;
 algorithm
   _ := match tree
+    // TODO: Normalize line-endings? We can output mixed CRLF/LF now...
     case LEAF() algorithm Print.printBuf(tokenContent(tree.token)); then ();
     case EMPTY() algorithm Print.printBuf("<EMPTY>"); then ();
     case NODE()

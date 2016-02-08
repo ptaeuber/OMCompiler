@@ -44,7 +44,7 @@
 #include "util/rational.h"
 #include "util/list.h"
 
-#define omc_dummyVarInfo {-1,"","",omc_dummyFileInfo}
+#define omc_dummyVarInfo {-1,-1,"","",omc_dummyFileInfo}
 #define omc_dummyEquationInfo {-1,0,"",-1,NULL}
 #define omc_dummyFunctionInfo {-1,"",omc_dummyFileInfo}
 #define omc_dummyRealAttribute {NULL,NULL,DBL_MAX,-DBL_MAX,0,0,1.0,0,0.0}
@@ -62,6 +62,7 @@ struct DATA;
 typedef struct VAR_INFO
 {
   int id;
+  int inputIndex; /* -1 means not an input */
   const char *name;
   const char *comment;
   FILE_INFO info;
@@ -312,7 +313,6 @@ typedef struct NONLINEAR_SYSTEM_DATA
   unsigned long numberOfIterations;     /* number of iteration of non-linear solvers of this system */
   double totalTime;                     /* save the totalTime */
   rtclock_t totalTimeClock;             /* time clock for the totalTime  */
-
   void* csvData;                        /* information to save csv data */
 } NONLINEAR_SYSTEM_DATA;
 

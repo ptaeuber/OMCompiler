@@ -58,13 +58,12 @@ extern modelica_integer nobox_stringCharInt(threadData_t *threadData,metamodelic
 #define intStringChar(X) nobox_intStringChar(threadData,X)
 extern metamodelica_string nobox_intStringChar(threadData_t *threadData,modelica_integer ix);
 
-/* String Operations */
+/* String Operations (MM extensions only) */
 #define stringInt(x) nobox_stringInt(threadData,x)
 #define stringReal(x) nobox_stringReal(threadData,x)
 extern modelica_integer nobox_stringInt(threadData_t*,metamodelica_string s);
 extern modelica_real nobox_stringReal(threadData_t*,metamodelica_string s);
 extern modelica_metatype stringListStringChar(metamodelica_string s);
-extern metamodelica_string_const stringAppend(metamodelica_string_const s1,metamodelica_string_const s2);
 extern metamodelica_string stringAppendList(modelica_metatype lst);
 extern metamodelica_string stringDelimitList(modelica_metatype lst,metamodelica_string_const delimiter);
 #define stringLength(x) MMC_STRLEN(x)
@@ -73,7 +72,7 @@ extern modelica_integer mmc_stringCompare(const void * str1,const void * str2);
 extern modelica_metatype boxptr_stringGetStringChar(threadData_t*,metamodelica_string str,modelica_metatype ix);
 #define stringGet(X,Y) nobox_stringGet(threadData,X,Y)
 extern modelica_integer nobox_stringGet(threadData_t *threadData,metamodelica_string str, modelica_integer ix);
-#define stringGetNoBoundsChecking(str,ix) MMC_STRINGDATA((str))[(ix)-1]
+#define stringGetNoBoundsChecking(str,ix) ((unsigned char*)MMC_STRINGDATA((str)))[(ix)-1]
 #define stringUpdateStringChar(X,Y,Z) boxptr_stringUpdateStringChar(threadData,X,Y,mmc_mk_icon(Z))
 extern modelica_metatype boxptr_stringUpdateStringChar(threadData_t *,metamodelica_string str, metamodelica_string c, modelica_metatype ix);
 extern modelica_integer stringHash(metamodelica_string_const);

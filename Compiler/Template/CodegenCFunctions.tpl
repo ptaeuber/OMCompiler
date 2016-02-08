@@ -2216,14 +2216,22 @@ template extFunCallBiVar(Variable var, Text &preExp, Text &varDecls, Text &auxFu
 ::=
   match var
   case var as VARIABLE(__) then
-    let var_name = extVarName(name)
+    let var_name = contextCref(name, contextFunction, &auxFunction)
     let &varDecls += '<%varType(var)%> <%var_name%>;<%\n%>'
     let defaultValue = match value
       case SOME(v) then
-        daeExp(v, contextFunction, &preExp, &varDecls, &auxFunction)
+        '<%daeExp(v, contextFunction, &preExp, &varDecls, &auxFunction)%>'
       else ""
-    let &preExp += if defaultValue then '<%var_name%> = <%defaultValue%>;<%\n%>'
-    ""
+    let instDimsInit = (instDims |> exp =>
+      daeExp(exp, contextFunction, &preExp, &varDecls, &auxFunction) ;separator=", ")
+    if instDims then
+      let type = expTypeArray(var.ty)
+      let &preExp += 'alloc_<%type%>(&<%var_name%>, <%listLength(instDims)%>, <%instDimsInit%>);<%\n%>'
+      let &preExp += if defaultValue then 'copy_<%type%>(<%defaultValue%>, &<%var_name%>);<%\n%>' else ''
+      ""
+    else
+      let &preExp += if defaultValue then '<%var_name%> = <%defaultValue%>;<%\n%>' else ''
+      ""
 end extFunCallBiVar;
 
 template extFunCallBiVarF77(Variable var, Text &preExp, Text &varDecls, Text &auxFunction)
@@ -5633,6 +5641,9 @@ template daeExpCall(Exp call, Context context, Text &preExp, Text &varDecls, Tex
     case "modelica_real" then
       let &preExp += '<%tvar%> = <%typeStr%>_to_modelica_string(<%sExp%>, <%minlenExp%>, <%leftjustExp%>, 6);<%\n%>'
       '<%tvar%>'
+    case "modelica_string" then
+      let &preExp += '<%tvar%> = <%sExp%>;<%\n%>'
+      '<%tvar%>'
     else
     let &preExp += '<%tvar%> = <%typeStr%>_to_modelica_string(<%sExp%><%enumStr%>, <%minlenExp%>, <%leftjustExp%>);<%\n%>'
     '<%tvar%>'
@@ -6518,7 +6529,7 @@ template daeExpMatchCases(list<MatchCase> cases, list<Exp> tupleAssignExps, DAE.
     /* Check guard condition after assignments */
     if (!<%daeExp(exp,context,&preGuardCheck,&varDeclsCaseInner, &auxFunction)%>) <%onPatternFail%>;<%\n%>
     >>)
-  let caseRes = (match c.result
+  let caseRes = match res case "" then "" else (match c.result
     case SOME(TUPLE(PR=exps)) then
       (exps |> e hasindex i1 fromindex 1 =>
       '<%getTempDeclMatchOutputName(exps, res, startIndexOutputs, i1)%> = <%daeExp(e,context,&preRes,&varDeclsCaseInner, &auxFunction)%>;<%\n%>')

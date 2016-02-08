@@ -37,6 +37,7 @@ const char *FLAG_NAME[FLAG_MAX+1] = {
   /* FLAG_ALARM */                 "alarm",
   /* FLAG_CLOCK */                 "clock",
   /* FLAG_CPU */                   "cpu",
+  /* FLAG_CSV_OSTEP */             "csvOstep",
   /* FLAG_DASSL_JACOBIAN */        "dasslJacobian",
   /* FLAG_DASSL_NO_RESTART */      "dasslnoRestart",
   /* FLAG_DASSL_NO_ROOTFINDING */  "dasslnoRootFinding",
@@ -49,6 +50,7 @@ const char *FLAG_NAME[FLAG_MAX+1] = {
   /* FLAG_IIT */                   "iit",
   /* FLAG_ILS */                   "ils",
   /* FLAG_INITIAL_STEP_SIZE */     "initialStepSize",
+  /* FLAG_INPUT_CSV */             "csvInput",
   /* FLAG_INPUT_FILE */            "exInputFile",
   /* FLAG_INPUT_FILE_STATES */     "stateFile",
   /* FLAG_IPOPT_HESSE*/            "ipopt_hesse",
@@ -94,6 +96,7 @@ const char *FLAG_DESC[FLAG_MAX+1] = {
   /* FLAG_ALARM */                 "aborts after the given number of seconds (0 disables)",
   /* FLAG_CLOCK */                 "selects the type of clock to use -clock=RT, -clock=CYC or -clock=CPU",
   /* FLAG_CPU */                   "dumps the cpu-time into the results-file",
+  /* FLAG_CSV_OSTEP */             "value specifies csv-files for debuge values for optimizer step",
   /* FLAG_DASSL_JACOBIAN */        "selects the type of the jacobians that is used for the dassl solver.\n  dasslJacobian=[coloredNumerical (default) |numerical|internalNumerical|coloredSymbolical|symbolical].",
   /* FLAG_DASSL_NO_RESTART */      "flag deactivates the restart of dassl after an event is performed.",
   /* FLAG_DASSL_NO_ROOTFINDING */  "flag deactivates the internal root finding procedure of dassl.",
@@ -106,6 +109,7 @@ const char *FLAG_DESC[FLAG_MAX+1] = {
   /* FLAG_IIT */                   "[double] value specifies a time for the initialization of the model",
   /* FLAG_ILS */                   "[int] default: 1",
   /* FLAG_INITIAL_STEP_SIZE */     "value specifies an initial stepsize for the dassl solver",
+  /* FLAG_INPUT_CSV */             "value specifies an csv-file with inputs for the simulation/optimization of the model",
   /* FLAG_INPUT_FILE */            "value specifies an external file with inputs for the simulation/optimization of the model",
   /* FLAG_INPUT_FILE_STATES */     "value specifies an file with states start values for the optimization of the model",
   /* FLAG_IPOPT_HESSE */           "value specifies the hessian for Ipopt",
@@ -157,6 +161,8 @@ const char *FLAG_DETAILED_DESC[FLAG_MAX+1] = {
   "  * CPU (process-based CPU-time)",
   /* FLAG_CPU */
   "  Dumps the cpu-time into the result-file using the variable named $cpuTime",
+  /* FLAG_CSV_OSTEP */
+  "value specifies csv-files for debuge values for optimizer step",
   /* FLAG_DASSL_JACOBIAN */
   "  Selects the type of the Jacobian that is used for the dassl solver:\n\n"
   "  * coloredNumerical (colored numerical Jacobian, the default).\n"
@@ -188,9 +194,11 @@ const char *FLAG_DETAILED_DESC[FLAG_MAX+1] = {
   "  The value is an Integer with default value 1.",
   /* FLAG_INITIAL_STEP_SIZE */
   "  Value specifies an initial stepsize for the dassl solver.",
+   /* FLAG_INPUT_CSV */
+  "  Value specifies an csv-file with inputs for the simulation/optimization of the model",
   /* FLAG_INPUT_FILE */
   "  Value specifies an external file with inputs for the simulation/optimization of the model.",
-  /* FLAG_INPUT_FILE_STATES */
+ /* FLAG_INPUT_FILE_STATES */
   "  Value specifies an file with states start values for the optimization of the model.",
   /* FLAG_IPOPT_HESSE */
   "  Value specifies the hessematrix for Ipopt(OMC, BFGS, const).",
@@ -293,6 +301,7 @@ const int FLAG_TYPE[FLAG_MAX] = {
   /* FLAG_ALARM */                 FLAG_TYPE_OPTION,
   /* FLAG_CLOCK */                 FLAG_TYPE_OPTION,
   /* FLAG_CPU */                   FLAG_TYPE_FLAG,
+  /* FLAG_CSV_OSTEP */             FLAG_TYPE_OPTION,
   /* FLAG_DASSL_JACOBIAN */        FLAG_TYPE_OPTION,
   /* FLAG_DASSL_NO_RESTART */      FLAG_TYPE_FLAG,
   /* FLAG_DASSL_NO_ROOTFINDING */  FLAG_TYPE_FLAG,
@@ -305,6 +314,7 @@ const int FLAG_TYPE[FLAG_MAX] = {
   /* FLAG_IIT */                   FLAG_TYPE_OPTION,
   /* FLAG_ILS */                   FLAG_TYPE_OPTION,
   /* FLAG_INITIAL_STEP_SIZE */     FLAG_TYPE_OPTION,
+  /* FLAG_INPUT_CSV */             FLAG_TYPE_OPTION,
   /* FLAG_INPUT_FILE */            FLAG_TYPE_OPTION,
   /* FLAG_INPUT_FILE_STATES */     FLAG_TYPE_OPTION,
   /* FLAG_IPOPT_HESSE */           FLAG_TYPE_OPTION,
@@ -349,30 +359,32 @@ const char *SOLVER_METHOD_NAME[S_MAX] = {
   "optimization",
   "radau5",
   "radau3",
-  "radau1",
-  "lobatto2",
+  "impeuler",
+  "trapezoid",
   "lobatto4",
   "lobatto6",
   "symEuler",
   "symEulerSsc",
+  "heun",
   "qss"
 };
 
 const char *SOLVER_METHOD_DESC[S_MAX] = {
   "unknown",
-  "euler",
-  "rungekutta",
-  "dassl with colored numerical jacobian, with interval root finding - default",
-  "optimization",
-  "radau5 [sundial/kinsol needed]",
-  "radau3 [sundial/kinsol needed]",
-  "radau1 [sundial/kinsol needed]",
-  "lobatto2 [sundial/kinsol needed]",
-  "lobatto4 [sundial/kinsol needed]",
-  "lobatto6 [sundial/kinsol needed]",
-  "symbolic implicit euler, [compiler flag +symEuler needed]",
-  "symbolic implicit euler with step-size control, [compiler flag +symEuler needed]",
-  "qss"
+  "euler - Explicit Euler (order 1)",
+  "rungekutta - Runge-Kutta (fixed step, order 4)",
+  "dassl - BDF solver with colored numerical jacobian, with interval root finding - default",
+  "optimization - Special solver for dynamic optimization",
+  "radau5 - Radau IIA with 3 points, \"Implicit Runge-Kutta\", order 5 [sundial/kinsol needed]",
+  "radau3 - Radau IIA with 2 points, \"Implicit Runge-Kutta\", order 3 [sundial/kinsol needed]",
+  "impeuler - Implicit Euler (actually Radau IIA, order 1) [sundial/kinsol needed]",
+  "trapezoid - Trapezoidal rule (actually Lobatto IIA with 2 points) [sundial/kinsol needed]",
+  "lobatto4 - Lobatto IIA with 3 points, order 4 [sundial/kinsol needed]",
+  "lobatto6 - Lobatto IIA with 4 points, order 6 [sundial/kinsol needed]",
+  "symEuler - symbolic implicit euler, [compiler flag +symEuler needed]",
+  "symEulerSsc - symbolic implicit euler with step-size control, [compiler flag +symEuler needed]",
+  "heun - Heun's method (Runge-Kutta fixed step, order 2)",
+  "qss - A QSS solver [experimental]"
 };
 
 const char *INIT_METHOD_NAME[IIM_MAX] = {
