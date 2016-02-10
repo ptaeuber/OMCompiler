@@ -91,6 +91,11 @@ uniontype Slot
   end SLOT;
 end Slot;
 
+constant Option<tuple<DAE.Exp, DAE.Properties, DAE.Attributes>> BUILTIN_TIME =
+  SOME((DAE.CREF(DAE.CREF_IDENT("time", DAE.T_REAL_DEFAULT, {}), DAE.T_REAL_DEFAULT),
+        DAE.PROP(DAE.T_REAL_DEFAULT, DAE.C_VAR()),
+        DAE.dummyAttrInput));
+
 protected import Array;
 protected import BackendInterface;
 protected import Ceval;
@@ -1205,6 +1210,11 @@ algorithm
         algItem1 = Absyn.ALGORITHMITEM(Absyn.ALG_NORETCALL(Absyn.CREF_IDENT("fail",{}),Absyn.FUNCTIONARGS({},{})),comment,info);
         algItem2 = Absyn.ALGORITHMITEM(Absyn.ALG_IF(left,{algItem1},{},{}),comment,info);
       then {algItem2};
+
+    case Absyn.EQ_PDE()
+      equation
+        fail("PDE in Static.fromEquationToAlgAssignment() not handled");
+      then {};
 
     case Absyn.EQ_NORETCALL(Absyn.CREF_IDENT("fail",_),_)
       equation
@@ -10298,6 +10308,12 @@ algorithm
       then
         (cache, SOME((exp, DAE.PROP(t, DAE.C_CONST()), DAE.dummyAttrConst)));
 
+    case (_, _, Absyn.CREF_IDENT(name = "time"), _, _)
+      algorithm
+        res := if isValidTimeScope(inEnv, info) then BUILTIN_TIME else NONE();
+      then
+        (inCache, res);
+
     // MetaModelica arrays are only used in function context as IDENT, and at most one subscript
     // No vectorization is performed
     case (cache, env, Absyn.CREF_IDENT(name = id, subscripts = {Absyn.SUBSCRIPT(e)}), impl, pre)
@@ -10424,6 +10440,34 @@ algorithm
         (cache,NONE());
   end matchcontinue;
 end elabCref1;
+
+protected function isValidTimeScope
+  "Checks if time is allowed to be used in the current scope."
+  input FCore.Graph inEnv;
+  input SourceInfo inInfo;
+  output Boolean outIsValid;
+protected
+  SCode.Restriction res;
+algorithm
+  try
+    res := FGraph.lastScopeRestriction(inEnv);
+  else
+    outIsValid := true;
+    return;
+  end try;
+
+  outIsValid := match res
+    case SCode.R_CLASS() then true;
+    case SCode.R_OPTIMIZATION() then true;
+    case SCode.R_MODEL() then true;
+    case SCode.R_BLOCK() then true;
+    else
+      algorithm
+        Error.addSourceMessage(Error.INVALID_TIME_SCOPE, {}, inInfo);
+      then
+        false;
+  end match;
+end isValidTimeScope;
 
 protected function lookupFunctionsInEnvNoError
   input FCore.Cache inCache;
@@ -10799,10 +10843,10 @@ algorithm
     case (SCode.CONST(), _, DAE.EQBOUND(evaluatedExp = SOME(v), constant_ = DAE.C_CONST()),
         InstTypes.SPLICEDEXPDATA(SOME(DAE.CREF(componentRef = cr)), _))
       algorithm
-        {DAE.INDEX(DAE.CREF(componentRef = subCr2)), slice as DAE.SLICE()} := ComponentReference.crefLastSubs(cr);
+        {DAE.INDEX(DAE.CREF(componentRef = subCr2)), DAE.SLICE(exp = e)} := ComponentReference.crefLastSubs(cr);
         {DAE.INDEX(index as DAE.CREF(componentRef = subCr1))} := ComponentReference.crefLastSubs(inCref);
         true := ComponentReference.crefEqual(subCr1, subCr2);
-        DAE.SLICE(DAE.ARRAY()) := slice;
+        true := Expression.isArray(e) or Expression.isRange(e);
         e := ValuesUtil.valueExp(v);
         e := DAE.ASUB(e, {index});
       then
@@ -11157,16 +11201,37 @@ algorithm
     case( ((DAE.SLICE( DAE.ARRAY(_,_,expl1) )):: subs1),id,ety) // {1,2,3}
       equation
         exp2 = flattenSubscript2(subs1,id,ety);
-        expl2 = List.map3(expl1,applySubscript,exp2,id,ety);
-        exp3 = DAE.ARRAY(DAE.T_INTEGER_DEFAULT,false,expl2);
-        (iLst, scalar) = extractDimensionOfChild(exp3);
-        ety = Expression.arrayEltType(ety);
-        exp3 = DAE.ARRAY(DAE.T_ARRAY(ety, iLst, DAE.emptyTypeSource), scalar, expl2);
-        //exp3 = removeDoubleEmptyArrays(exp3);
       then
-        exp3;
+        flattenSubscript3(expl1, id, ety, exp2);
+
+    case ((sub1 as DAE.SLICE(exp = DAE.RANGE())) :: subs1, id, ety)
+      algorithm
+        expl1 := Expression.expandRange(sub1.exp);
+        exp2 := flattenSubscript2(subs1, id, ety);
+      then
+        flattenSubscript3(expl1, id, ety, exp2);
+
   end matchcontinue;
 end flattenSubscript2;
+
+protected function flattenSubscript3
+  input list<DAE.Exp> inSubscripts;
+  input String inName;
+  input DAE.Type inType;
+  input DAE.Exp inExp;
+  output DAE.Exp outExp;
+protected
+  list<DAE.Exp> expl;
+  list<DAE.Dimension> dims;
+  Boolean scalar;
+  DAE.Type ty;
+algorithm
+  expl := list(applySubscript(e, inExp, inName, inType) for e in inSubscripts);
+  outExp := DAE.ARRAY(DAE.T_INTEGER_DEFAULT, false, expl);
+  (dims, scalar) := extractDimensionOfChild(outExp);
+  ty := Expression.arrayEltType(inType);
+  outExp := DAE.ARRAY(DAE.T_ARRAY(ty, dims, DAE.emptyTypeSource), scalar, expl);
+end flattenSubscript3;
 
 protected function removeDoubleEmptyArrays
 " A help function, to prevent the {{}} look of empty arrays."

@@ -653,6 +653,7 @@ function inStream
 </html>"));
 end inStream;
 
+
 /* Extension for uncertainty computations */
 record Distribution
   String name "the name of the distibution, e.g \"normal\" ";
@@ -2786,7 +2787,7 @@ end checkCodeGraph;
 
 function val "Return the value of a variable at a given time in the simulation results"
   input VariableName var;
-  input Real time;
+  input Real timePoint;
   input String fileName = "<default>" "The contents of the currentSimulationResult variable";
   output Real valAtTime;
 external "builtin";
