@@ -263,8 +263,8 @@ int solveLapack(DATA *data, threadData_t *threadData, int sysNumber)
       residualNorm = _omc_euclideanVectorNorm(solverData->work);
       if ((isnan(residualNorm)) || (residualNorm>1e-4)){
         warningStreamPrint(LOG_LS, 0,
-            "Failed to solve linear system of equations (no. %d) at time %f, because of division by zero.",
-            (int)systemData->equationIndex, data->localData[0]->timeValue);
+            "Failed to solve linear system of equations (no. %d) at time %f. Residual norm is %g.",
+            (int)systemData->equationIndex, data->localData[0]->timeValue, residualNorm);
         success = 0;
       }
     } else {
