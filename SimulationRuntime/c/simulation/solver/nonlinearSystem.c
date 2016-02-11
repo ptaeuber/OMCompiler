@@ -575,8 +575,9 @@ int solve_nonlinear_system(DATA *data, threadData_t *threadData, int sysNumber)
   /* if list is empty use current start values */
   if (listLen(((VALUES_LIST*)nonlinsys->oldValueList)->valueList)==0)
   {
-	memcpy(nonlinsys->nlsxOld, nonlinsys->nlsx, nonlinsys->size*(sizeof(double)));
-	memcpy(nonlinsys->nlsxExtrapolation, nonlinsys->nlsx, nonlinsys->size*(sizeof(double)));
+    //memcpy(nonlinsys->nlsxOld, nonlinsys->nlsx, nonlinsys->size*(sizeof(double)));
+    //memcpy(nonlinsys->nlsxExtrapolation, nonlinsys->nlsx, nonlinsys->size*(sizeof(double)));
+    memcpy(nonlinsys->nlsx, nonlinsys->nlsxOld, nonlinsys->size*(sizeof(double)));
   }
   else
   {
@@ -682,7 +683,7 @@ int solve_nonlinear_system(DATA *data, threadData_t *threadData, int sysNumber)
   nonlinsys->solved = success;
 
   /* write solution to oldValue list for extrapolation */
-  if (nonlinsys->solved)
+  if (nonlinsys->solved == 1)
   {
     /* do not use solution of jacobian for next extrapolation */
     if (data->simulationInfo->currentContext < 4)
@@ -690,6 +691,11 @@ int solve_nonlinear_system(DATA *data, threadData_t *threadData, int sysNumber)
       addListElement((VALUES_LIST*)nonlinsys->oldValueList,
               createValueElement(nonlinsys->size, data->localData[0]->timeValue, nonlinsys->nlsx));
     }
+  }
+  else if (nonlinsys->solved == 2)
+  {
+    if (listLen(((VALUES_LIST*)nonlinsys->oldValueList)->valueList)>0)
+      cleanValueList((VALUES_LIST*)nonlinsys->oldValueList, NULL);
   }
   messageClose(LOG_NLS_EXTRAPOLATE);
 
