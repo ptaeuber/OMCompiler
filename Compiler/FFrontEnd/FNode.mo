@@ -34,7 +34,6 @@ encapsulated package FNode
   package:     FNode
   description: A node structure to hold Modelica constructs
 
-  RCS: $Id: FNode.mo 14085 2012-11-27 12:12:40Z adrpo $
 
   This module builds nodes out of SCode
 "
@@ -1032,7 +1031,7 @@ public function nonImplicitRefFromScope
   input Scope inScope;
   output Ref outRef;
 algorithm
-  outRef := matchcontinue(inScope)
+  outRef := match(inScope)
     local
       Ref r;
       Scope rest;
@@ -1046,7 +1045,7 @@ algorithm
     case (_::rest)
       then
         nonImplicitRefFromScope(rest);
-  end matchcontinue;
+  end match;
 end nonImplicitRefFromScope;
 
 public function namesUpToParentName
@@ -2793,7 +2792,7 @@ algorithm
         str = r(a);
       then
         str;
-    case (NONE(),_) then "";
+    else "";
   end match;
 end getOptionStr;
 
@@ -2851,8 +2850,8 @@ protected function getHeight "Retrieve the height of a node"
   output Integer height;
 algorithm
   height := match (bt)
-    case(NONE()) then 0;
     case(SOME(FCore.CAVLTREENODE(height = height))) then height;
+    else 0;
   end match;
 end getHeight;
 

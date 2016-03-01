@@ -34,61 +34,62 @@ encapsulated package InstUtil
   package:     InstUtil
   description: Instantiation utilities
 
-  RCS: $Id: InstUtil.mo 17556 2013-10-05 23:58:57Z adrpo $
 
   This package supports Inst*.mo
 "
 
-public import Absyn;
-public import ClassInf;
-public import DAE;
-public import FCore;
-public import GlobalScript;
-public import InnerOuter;
-public import InstTypes;
-public import Mod;
-public import Prefix;
-public import SCode;
-public import UnitAbsyn;
-public import Values;
-public import HashTable;
-public import HashTable5;
+import Absyn;
+import ClassInf;
+import DAE;
+import FCore;
+import GlobalScript;
+import InnerOuter;
+import InstTypes;
+import Mod;
+import Prefix;
+import SCode;
+import UnitAbsyn;
+import Values;
+import HashTable;
+import HashTable5;
 
-protected import List;
-protected import BaseHashTable;
-protected import Expression;
-protected import Error;
-protected import Util;
-protected import ComponentReference;
-protected import Patternm;
-protected import DAEUtil;
-protected import DAEDump;
-protected import Types;
-protected import Debug;
-protected import PrefixUtil;
-protected import ExpressionDump;
-protected import Flags;
-protected import FGraph;
-protected import FNode;
-protected import SCodeDump;
-protected import Lookup;
-protected import ValuesUtil;
-protected import Static;
-protected import Ceval;
-protected import Dump;
-protected import Config;
-protected import Inst;
-protected import InstFunction;
-protected import InstSection;
-protected import System;
-protected import ErrorExt;
-protected import InstExtends;
-protected import Graph;
-protected import UnitAbsynBuilder;
-protected import UnitChecker;
-protected import NFSCodeFlatten;
-protected import HashSet;
-protected import BaseHashSet;
+protected
+import List;
+import BaseHashTable;
+import Expression;
+import Error;
+import Util;
+import ComponentReference;
+import Patternm;
+import DAEUtil;
+import DAEDump;
+import Types;
+import Debug;
+import PrefixUtil;
+import ExpressionDump;
+import Flags;
+import FGraph;
+import FNode;
+import SCodeDump;
+import Lookup;
+import ValuesUtil;
+import Static;
+import Ceval;
+import Dump;
+import Config;
+import Inst;
+import InstFunction;
+import InstSection;
+import System;
+import ErrorExt;
+import InstExtends;
+import Graph;
+import UnitAbsynBuilder;
+import UnitChecker;
+import NFSCodeFlatten;
+import HashSet;
+import BaseHashSet;
+import MetaModelica.Dangerous.listReverseInPlace;
 
 protected type Ident = DAE.Ident "an identifier";
 protected type InstanceHierarchy = InnerOuter.InstHierarchy "an instance hierarchy";
@@ -333,6 +334,7 @@ algorithm
         "OpenModelica" = Absyn.pathLastIdent(path2);
       then Util.assoc(name,{
         ("Expression",    DAE.T_CODE(DAE.C_EXPRESSION(),DAE.emptyTypeSource)),
+        ("ExpressionOrModification",    DAE.T_CODE(DAE.C_EXPRESSION_OR_MODIFICATION(),DAE.emptyTypeSource)),
         ("TypeName",      DAE.T_CODE(DAE.C_TYPENAME(),DAE.emptyTypeSource)),
         ("VariableName",  DAE.T_CODE(DAE.C_VARIABLENAME(),DAE.emptyTypeSource)),
         ("VariableNames", DAE.T_CODE(DAE.C_VARIABLENAMES(),DAE.emptyTypeSource))
@@ -698,45 +700,30 @@ public function equalityConstraint
   input FCore.Graph inEnv;
   input list<SCode.Element> inCdefelts;
   input SourceInfo info;
-  output DAE.EqualityConstraint outResult;
+  output DAE.EqualityConstraint outResult=NONE();
+protected
+  list<SCode.Element> els;
+  Absyn.Path path;
+  Integer dimension;
+  DAE.InlineType inlineType;
 algorithm
-  outResult := matchcontinue(inEnv,inCdefelts,info)
-  local
-      list<SCode.Element> tail, els;
-      FCore.Graph env;
-      Absyn.Path path;
-      Integer dimension;
-      DAE.InlineType inlineType;
-      SCode.Element el;
-
-    case(_,{},_) then NONE();
-
-    case(env, (el as SCode.CLASS(name = "equalityConstraint", restriction = SCode.R_FUNCTION(_),
-         classDef = SCode.PARTS(elementLst = els))) :: _, _)
-      equation
-        SOME(path) = FGraph.getScopePath(env);
-        path = Absyn.joinPaths(path, Absyn.IDENT("equalityConstraint"));
-        path = Absyn.makeFullyQualified(path);
-        /*(cache, env,_) = implicitFunctionTypeInstantiation(cache, env, classDef);
-        (cache, types,_) = Lookup.lookupFunctionsInEnv(cache, env, path, info);
-        length = listLength(types);
-        print("type count: ");
-        print(intString(length));
-        print("\n");*/
-        dimension = equalityConstraintOutputDimension(els);
-        /*print("dimension: ");
-        print(intString(dimension));
-        print("\n");*/
-        // adrpo: get the inline type of the function
-        inlineType = isInlineFunc(el);
-      then
-        SOME((path, dimension, inlineType));
-
-    case(env, _ :: tail, _)
-      then
-        equalityConstraint(env, tail, info);
-
-  end matchcontinue;
+  try
+    SOME(path) := FGraph.getScopePath(inEnv);
+    path := Absyn.joinPaths(path, Absyn.IDENT("equalityConstraint"));
+    path := Absyn.makeFullyQualified(path);
+  else
+    return;
+  end try;
+  for el in inCdefelts loop
+    try
+      SCode.CLASS(name = "equalityConstraint", restriction = SCode.R_FUNCTION(), classDef = SCode.PARTS(elementLst = els)) := el;
+      dimension := equalityConstraintOutputDimension(els);
+      inlineType := isInlineFunc(el);
+      outResult := SOME((path, dimension, inlineType));
+      return;
+    else
+    end try;
+  end for;
 end equalityConstraint;
 
 public function handleUnitChecking
@@ -1320,35 +1307,10 @@ public function constantEls
  Used buy partialInstClassdef to instantiate constants in packages."
   input list<SCode.Element> elements;
   output list<SCode.Element> outElements;
+protected
+  SCode.Attributes attr;
 algorithm
-  outElements := matchcontinue (elements)
-    local
-      SCode.Attributes attr;
-      SCode.Element el;
-      list<SCode.Element> els,els1;
-      SCode.Comment cmt;
-
-    case ({}) then {};
-
-    // constants
-    case ((el as SCode.COMPONENT(attributes=attr))::els)
-     equation
-        true = SCode.isConstant(SCode.attrVariability(attr)); // or SCode.getEvaluateAnnotation(cmt);
-        els1 = constantEls(els);
-    then (el::els1);
-
-    /*/ final parameters
-    case ((el as SCode.COMPONENT(prefixes = SCode.PREFIXES(finalPrefix = SCode.FINAL()), attributes=attr))::els)
-     equation
-        true = SCode.isParameterOrConst(SCode.attrVariability(attr));
-        els1 = constantEls(els);
-    then (el::els1);*/
-
-    case (_::els)
-      equation
-        els1 = constantEls(els);
-     then els1;
-  end matchcontinue;
+  outElements := list(el for el guard match el case SCode.COMPONENT(attributes=attr) then SCode.isConstant(SCode.attrVariability(attr)); else false; end match in elements);
 end constantEls;
 
 public function constantAndParameterEls
@@ -1357,26 +1319,10 @@ public function constantAndParameterEls
  Used by partialInstClassdef to instantiate constants and parameters in packages."
   input list<SCode.Element> elements;
   output list<SCode.Element> outElements;
+protected
+  SCode.Attributes attr;
 algorithm
-  outElements := matchcontinue (elements)
-    local
-      SCode.Attributes attr;
-      SCode.Element el;
-      list<SCode.Element> els,els1;
-
-    case ({}) then {};
-
-    case ((el as SCode.COMPONENT(attributes=attr))::els)
-     equation
-        true = SCode.isParameterOrConst(SCode.attrVariability(attr));
-        els1 = constantAndParameterEls(els);
-    then (el::els1);
-
-    case (_::els)
-      equation
-        els1 = constantAndParameterEls(els);
-     then els1;
-  end matchcontinue;
+  outElements := list(el for el guard match el case SCode.COMPONENT(attributes=attr) then SCode.isParameterOrConst(SCode.attrVariability(attr)); else false; end match in elements);
 end constantAndParameterEls;
 
 protected function removeBindings
@@ -1497,18 +1443,7 @@ public function addNomod
   input list<SCode.Element> inElements;
   output list<tuple<SCode.Element, DAE.Mod>> outElements;
 algorithm
-  outElements := match(inElements)
-    local
-      list<tuple<SCode.Element, DAE.Mod>> res;
-      SCode.Element x;
-      list<SCode.Element> xs;
-    case {} then {};
-    case ((x :: xs))
-      equation
-        res = addNomod(xs);
-      then
-        ((x,DAE.NOMOD()) :: res);
-  end match;
+  outElements := list((x,DAE.NOMOD()) for x in inElements);
 end addNomod;
 
 public function sortElementList
@@ -5344,8 +5279,8 @@ algorithm
      */
     case (id,els,SCode.EXTERNALDECL(lang = lang))
       equation
-        (outvar :: {}) = List.filter(els, isOutputVar);
-        invars = List.filter(els, isInputVar);
+        (outvar :: {}) = List.filterOnTrue(els, isOutputVar);
+        invars = List.filterOnTrue(els, isInputVar);
         explists = List.map(invars, instExtMakeCrefs);
         exps = List.flatten(explists);
         {Absyn.CREF(retcref)} = instExtMakeCrefs(outvar);
@@ -5354,7 +5289,7 @@ algorithm
         extdecl;
     case (id,els,SCode.EXTERNALDECL(lang = lang))
       equation
-        inoutvars = List.filter(els, isInoutVar);
+        inoutvars = List.filterOnTrue(els, isInoutVar);
         explists = List.map(inoutvars, instExtMakeCrefs);
         exps = List.flatten(explists);
         extdecl = SCode.EXTERNALDECL(SOME(id),lang,NONE(),exps,NONE());
@@ -5372,29 +5307,30 @@ end instExtMakeExternaldecl;
 protected function isInoutVar
 "Succeds for Elements that are input or output components"
   input SCode.Element inElement;
+  output Boolean b;
 algorithm
-  _ := matchcontinue (inElement)
-    local SCode.Element e;
-    case e equation isOutputVar(e); then ();
-    case e equation isInputVar(e); then ();
-  end matchcontinue;
+  b := isOutputVar(inElement) or isInputVar(inElement);
 end isInoutVar;
 
 protected function isOutputVar
 "Succeds for element that is output component"
   input SCode.Element inElement;
+  output Boolean b;
 algorithm
-  _ := match (inElement)
-    case SCode.COMPONENT(attributes = SCode.ATTR(direction = Absyn.OUTPUT())) then ();
+  b := match (inElement)
+    case SCode.COMPONENT(attributes = SCode.ATTR(direction = Absyn.OUTPUT())) then true;
+    else false;
   end match;
 end isOutputVar;
 
 protected function isInputVar
 "Succeds for element that is input component"
   input SCode.Element inElement;
+  output Boolean b;
 algorithm
-  _ := match (inElement)
-    case SCode.COMPONENT(attributes = SCode.ATTR(direction = Absyn.INPUT())) then ();
+  b := match (inElement)
+    case SCode.COMPONENT(attributes = SCode.ATTR(direction = Absyn.INPUT())) then true;
+    else false;
   end match;
 end isInputVar;
 
@@ -6537,61 +6473,53 @@ This function splits the Element list into four lists
 3. Extends elements
 4. Components"
   input list<SCode.Element> elts;
-  output list<SCode.Element> cdefImpElts;
-  output list<SCode.Element> classextendsElts;
-  output list<SCode.Element> extElts;
-  output list<SCode.Element> compElts;
+  output list<SCode.Element> cdefImpElts={};
+  output list<SCode.Element> classextendsElts={};
+  output list<SCode.Element> extElts={};
+  output list<SCode.Element> compElts={};
 algorithm
-  (cdefImpElts,classextendsElts,extElts,compElts) := match (elts)
-    local
-      list<SCode.Element> comps,xs;
-      SCode.Element cdef,imp,ext,comp;
+  for elt in elts loop
+    _ := match elt
+      case SCode.CLASS()
+        algorithm
+          if match elt.classDef case SCode.CLASS_EXTENDS() then true; else false; end match then
+            // class definitions with class extends
+            classextendsElts := elt :: classextendsElts;
+          else
+            // class definitions without class extends
+            cdefImpElts := elt :: cdefImpElts;
+          end if;
+        then ();
 
-    // empty case
-    case ({}) then ({},{},{},{});
+      // imports
+      case SCode.IMPORT()
+        algorithm
+          cdefImpElts := elt :: cdefImpElts;
+        then ();
 
-    // class definitions with class extends
-    case ((cdef as SCode.CLASS(classDef = SCode.CLASS_EXTENDS()))::xs)
-      equation
-        (cdefImpElts,classextendsElts,extElts,comps) = splitElts(xs);
-      then
-        (cdefImpElts,cdef :: classextendsElts,extElts,comps);
+      // units
+      case SCode.DEFINEUNIT()
+        algorithm
+          cdefImpElts := elt :: cdefImpElts;
+        then ();
 
-    // class definitions without class extends
-    case (((cdef as SCode.CLASS()) :: xs))
-      equation
-        (cdefImpElts,classextendsElts,extElts,comps) = splitElts(xs);
-      then
-        (cdef :: cdefImpElts,classextendsElts,extElts,comps);
+      // extends elements
+      case SCode.EXTENDS()
+        algorithm
+          extElts := elt :: extElts;
+        then ();
 
-    // imports
-    case (((imp as SCode.IMPORT()) :: xs))
-      equation
-        (cdefImpElts,classextendsElts,extElts,comps) = splitElts(xs);
-      then
-        (imp :: cdefImpElts,classextendsElts,extElts,comps);
-
-    // units
-    case (((imp as SCode.DEFINEUNIT()) :: xs))
-      equation
-        (cdefImpElts,classextendsElts,extElts,comps) = splitElts(xs);
-      then
-        (imp :: cdefImpElts,classextendsElts,extElts,comps);
-
-    // extends elements
-    case((ext as SCode.EXTENDS())::xs)
-      equation
-        (cdefImpElts,classextendsElts,extElts,comps) = splitElts(xs);
-      then
-        (cdefImpElts,classextendsElts,ext::extElts,comps);
-
-    // components
-    case ((comp as SCode.COMPONENT()) :: xs)
-      equation
-        (cdefImpElts,classextendsElts,extElts,comps) = splitElts(xs);
-      then
-        (cdefImpElts,classextendsElts,extElts,comp::comps);
-  end match;
+      // components
+      case SCode.COMPONENT()
+        algorithm
+          compElts := elt :: compElts;
+        then ();
+    end match;
+  end for;
+  cdefImpElts := listReverseInPlace(cdefImpElts);
+  classextendsElts := listReverseInPlace(classextendsElts);
+  extElts := listReverseInPlace(extElts);
+  compElts := listReverseInPlace(compElts);
 end splitElts;
 
 public function splitEltsNoComponents "
@@ -8510,30 +8438,24 @@ algorithm
     case (DAE.ASUB(exp=exp),unbound) then crefFiltering(exp,unbound);
     case (DAE.PATTERN(pattern=pattern),unbound)
       equation
-        ((_,unbound)) = Patternm.traversePattern((pattern,unbound),patternFiltering);
+        (_,unbound) = Patternm.traversePattern(pattern,patternFiltering,unbound);
       then unbound;
     else inUnbound;
   end match;
 end crefFiltering;
 
 protected function patternFiltering
-  input tuple<DAE.Pattern,list<String>> inTpl;
-  output tuple<DAE.Pattern,list<String>> outTpl;
+  input DAE.Pattern inPat;
+  input list<String> inLst;
+  output DAE.Pattern outPat=inPat;
+  output list<String> unbound=inLst;
 algorithm
-  outTpl := match inTpl
-    local
-      list<String> unbound;
-      String id;
-      DAE.Pattern pattern;
-    case ((pattern as DAE.PAT_AS(id=id),unbound))
-      equation
-        unbound = List.filter1OnTrue(unbound,Util.stringNotEqual,id);
-      then ((pattern,unbound));
-    case ((pattern as DAE.PAT_AS_FUNC_PTR(id=id),unbound))
-      equation
-        unbound = List.filter1OnTrue(unbound,Util.stringNotEqual,id);
-      then ((pattern,unbound));
-    else inTpl;
+  unbound := match inPat
+    case DAE.PAT_AS()
+      then List.filter1OnTrue(unbound,Util.stringNotEqual,inPat.id);
+    case DAE.PAT_AS_FUNC_PTR()
+      then List.filter1OnTrue(unbound,Util.stringNotEqual,inPat.id);
+    else unbound;
   end match;
 end patternFiltering;
 
@@ -8614,7 +8536,7 @@ algorithm
       list<DAE.Statement> body;
     case (DAE.CASE(patterns=patterns,patternGuard=patternGuard,body=body,result=result,info=info,resultInfo=resultInfo),unbound)
       equation
-        ((_,unbound)) = Patternm.traversePattern((DAE.PAT_META_TUPLE(patterns),unbound),patternFiltering);
+        (_,unbound) = Patternm.traversePatternList(patterns,patternFiltering,unbound);
         (_,(unbound,_)) = Expression.traverseExpTopDown(DAE.META_OPTION(patternGuard),findUnboundVariableUse,(unbound,info));
         ((_,_,unbound)) = List.fold1(body, checkFunctionDefUseStmt, true, (false,false,unbound));
         (_,(unbound,_)) = Expression.traverseExpTopDown(DAE.META_OPTION(result),findUnboundVariableUse,(unbound,resultInfo));
@@ -8956,19 +8878,20 @@ algorithm
 //        then list(newEQFun(i, lhs_exp, rhs_exp, domainCr1, comment, info, fieldLst) for i in 2:N-1);
         then creatFieldEqs(lhs_exp, rhs_exp, domainCr, N, comment, info, fieldLst);
 
-      //left boundary extrapolation
-      case SCode.EQUATION(SCode.EQ_PDE(expLeft = lhs_exp, expRight = rhs_exp,
-                  domain = domainCr as Absyn.CREF_QUAL(name, subscripts, Absyn.CREF_IDENT(name="left")),
-                  comment = comment, info = info))
-        equation
-//          Absyn.CALL(function_ = Absyn.CREF_IDENT(name="extrapolateField", subscripts={}), functionArgs = Absyn.FUNCTIONARGS(args = {})) = rhs_exp;
-//          Absyn.CREF(fieldCr as Absyn.CREF_IDENT()) = lhs_exp;
+        //left boundary extrapolation
+/*        case SCode.EQUATION(SCode.EQ_PDE(expLeft = lhs_exp, expRight = rhs_exp,
+                      domain = domainCr as Absyn.CREF_QUAL(name, subscripts, Absyn.CREF_IDENT(name="left")),
+                      comment = comment, info = info))
+            equation
+//              Absyn.CALL(function_ = Absyn.CREF_IDENT(name="extrapolateField", subscripts={}), functionArgs = Absyn.FUNCTIONARGS(args = {})) = rhs_exp;
+//              Absyn.CREF(fieldCr as Absyn.CREF_IDENT()) = lhs_exp;
           fieldCr = matchExtrapAndField(lhs_exp, rhs_exp);
           domainCr1 = Absyn.CREF_IDENT(name, subscripts);
           (N,fieldLst) = getDomNFields(inDomFieldLst,domainCr1,info);
         then
           {extrapolateFieldEq(false, fieldCr, domainCr1, N, comment, info, fieldLst)};
-
+*/
+/*
       //right boundary extrapolation
       case SCode.EQUATION(SCode.EQ_PDE(expLeft = lhs_exp, expRight = rhs_exp,
                   domain = domainCr as Absyn.CREF_QUAL(name, subscripts, Absyn.CREF_IDENT(name="right")),
@@ -8976,47 +8899,103 @@ algorithm
         equation
 //          Absyn.CALL(function_ = Absyn.CREF_IDENT(name="extrapolateField", subscripts={}), functionArgs = Absyn.FUNCTIONARGS(args = {})) = rhs_exp;
 //          Absyn.CREF(fieldCr as Absyn.CREF_IDENT()) = lhs_exp;
+
           fieldCr = matchExtrapAndField(lhs_exp, rhs_exp);
           domainCr1 = Absyn.CREF_IDENT(name, subscripts);
           (N,fieldLst) = getDomNFields(inDomFieldLst,domainCr1,info);
         then
-          {extrapolateFieldEq(true, fieldCr, domainCr1, N, comment, info, fieldLst)};
-      //left boundary condition
+          {extrapolateFieldEq(true, fieldCr, domainCr1, N, comment, info, fieldLst)};*/
+      //left boundary condition or extrapolation
       case SCode.EQUATION(SCode.EQ_PDE(expLeft = lhs_exp, expRight = rhs_exp,
                   domain = domainCr as Absyn.CREF_QUAL(name, subscripts, Absyn.CREF_IDENT(name="left")),
                   comment = comment, info = info))
         equation
           domainCr1 = Absyn.CREF_IDENT(name, subscripts);
           (N,fieldLst) = getDomNFields(inDomFieldLst,domainCr1,info);
+          (lhs_exp, _) = Absyn.traverseExp(lhs_exp, extrapFieldTraverseFun, 1);
+          (rhs_exp, _) = Absyn.traverseExp(rhs_exp, extrapFieldTraverseFun, 1);
         then
           {newEQFun(1, lhs_exp, rhs_exp, domainCr1, comment, info, fieldLst)};
-      //right boundary condition
+      //right boundary condition or extrapolation
       case SCode.EQUATION(SCode.EQ_PDE(expLeft = lhs_exp, expRight = rhs_exp,
                   domain = domainCr as Absyn.CREF_QUAL(name, subscripts, Absyn.CREF_IDENT(name="right")),
                   comment = comment, info = info))
         equation
           domainCr1 = Absyn.CREF_IDENT(name, subscripts);
           (N,fieldLst) = getDomNFields(inDomFieldLst,domainCr1,info);
+          (lhs_exp, _) = Absyn.traverseExp(lhs_exp, extrapFieldTraverseFun, N);
+          (rhs_exp, _) = Absyn.traverseExp(rhs_exp, extrapFieldTraverseFun, N);
         then
           {newEQFun(N, lhs_exp, rhs_exp, domainCr1, comment, info, fieldLst)};
-
     end matchcontinue;
 
   outDiscretizedEQs := listAppend(inDiscretizedEQs, newDiscretizedEQs);
 end discretizePDE;
 
+protected function extrapFieldTraverseFun
+  input Absyn.Exp inExp;
+  input Integer inN "If N = 1 then left extrapolation, right extrapolation otherwise";
+  output Absyn.Exp outExp;
+  output Integer outN = inN;
+algorithm
+  outExp := match inExp
+    local
+      Absyn.Ident name;
+      list<Absyn.Subscript> subscripts;
+      Integer i;
+    case Absyn.CALL(
+                          function_ = Absyn.CREF_IDENT(name="extrapolateField", subscripts={}),
+                          functionArgs = Absyn.FUNCTIONARGS(args = {Absyn.CREF(Absyn.CREF_IDENT(name,subscripts))})
+                    )
+    equation
+      if inN == 1 then
+        i = 1;
+      else
+        i = -1;
+      end if;
+    then
+      Absyn.BINARY(
+               Absyn.BINARY(
+                 Absyn.INTEGER(2),
+                 Absyn.MUL(),
+                 Absyn.CREF(Absyn.CREF_IDENT(name, Absyn.SUBSCRIPT(Absyn.INTEGER(inN+i))::subscripts))
+               ),
+               Absyn.SUB(),
+               Absyn.CREF(Absyn.CREF_IDENT(name, Absyn.SUBSCRIPT(Absyn.INTEGER(inN+2*i))::subscripts))
+             );
+    else
+      inExp;
+  end match;
+
+
+end extrapFieldTraverseFun;
+
+
+
+
+
+
+
+//TODO: remove never called:
 protected function matchExtrapAndField
   input Absyn.Exp lhs_exp;
   input Absyn.Exp rhs_exp;
   output Absyn.ComponentRef fieldCr;
+  protected String s;
 algorithm
+  s := "Ahoj";
   fieldCr := match (lhs_exp, rhs_exp)
     local
-      Absyn.ComponentRef fcr;
-    case (Absyn.CALL(function_ = Absyn.CREF_IDENT(name="extrapolateField", subscripts={}), functionArgs = Absyn.FUNCTIONARGS(args = {})), Absyn.CREF(fcr as Absyn.CREF_IDENT()))
+      Absyn.ComponentRef fcr, fcr_arg;
+    case (Absyn.CALL(
+                          function_ = Absyn.CREF_IDENT(name="extrapolateField", subscripts={}),
+                          functionArgs = Absyn.FUNCTIONARGS(args = {Absyn.CREF(fcr_arg as Absyn.CREF_IDENT())})
+                    ),
+         Absyn.CREF(fcr as Absyn.CREF_IDENT())
+         )
     then
       fcr;
-    case (Absyn.CREF(fcr as Absyn.CREF_IDENT()),Absyn.CALL(function_ = Absyn.CREF_IDENT(name="extrapolateField", subscripts={}), functionArgs = Absyn.FUNCTIONARGS(args = {})))
+    case (Absyn.CREF(fcr as Absyn.CREF_IDENT()),Absyn.CALL(function_ = Absyn.CREF_IDENT(name="extrapolateField", subscripts={}), functionArgs = Absyn.FUNCTIONARGS(args = {Absyn.CREF(fcr_arg as Absyn.CREF_IDENT())})))
     then
       fcr;
   end match;
@@ -9211,7 +9190,7 @@ algorithm
         true = List.isMemberOnTrue(fieldCr,fieldLst,Absyn.crefEqual);
       then
         Absyn.CREF(Absyn.CREF_IDENT(name, Absyn.SUBSCRIPT(Absyn.INTEGER(i))::subscripts));
-    case Absyn.CALL(Absyn.CREF_IDENT("pder",subscripts),Absyn.FUNCTIONARGS({Absyn.CREF(fieldCr as Absyn.CREF_IDENT(name, subscripts)),Absyn.CREF(Absyn.CREF_IDENT(name="x"))},_))
+    case Absyn.CALL(Absyn.CREF_IDENT("pder",{}),Absyn.FUNCTIONARGS({Absyn.CREF(fieldCr as Absyn.CREF_IDENT(name, subscripts)),Absyn.CREF(Absyn.CREF_IDENT(name="x"))},_))
     //pder
       equation
         if not List.isMemberOnTrue(fieldCr,fieldLst,Absyn.crefEqual) then
@@ -9233,13 +9212,13 @@ algorithm
               Absyn.CREF(Absyn.CREF_QUAL(domName,{},Absyn.CREF_IDENT("dx",{})))
             )
           );
-    case Absyn.CALL(Absyn.CREF_IDENT("pder",subscripts),Absyn.FUNCTIONARGS({Absyn.CREF(_),_},_))
+    case Absyn.CALL(Absyn.CREF_IDENT("pder",{}),Absyn.FUNCTIONARGS({Absyn.CREF(_),_},_))
     //pder with differentiating wrt wrong variable
       equation
         Error.addSourceMessageAndFail(Error.COMPILER_ERROR,{"You are differentiating with respect to variable that is not a coordinate."}, info);
       then
         inExp;
-    case Absyn.CALL(Absyn.CREF_IDENT("pder",subscripts),Absyn.FUNCTIONARGS({_,_},_))
+    case Absyn.CALL(Absyn.CREF_IDENT("pder",{}),Absyn.FUNCTIONARGS({_,_},_))
       equation
         Error.addSourceMessageAndFail(Error.COMPILER_ERROR,{"Unsupported partial derivative."}, info);
       then

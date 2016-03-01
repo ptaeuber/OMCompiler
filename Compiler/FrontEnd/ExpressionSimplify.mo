@@ -34,7 +34,6 @@ encapsulated package ExpressionSimplify
   package:     ExpressionSimplify
   description: ExpressionSimplify
 
-  RCS: $Id$
 
   This file contains the module ExpressionSimplify, which contains
   functions to simplify a DAE.Expression."
@@ -98,6 +97,36 @@ algorithm
       then (e,false);
   end match;
 end condsimplify;
+
+public function simplifyBinaryExp
+  input DAE.Exp inExp;
+  output DAE.Exp outExp;
+algorithm
+  outExp := match(inExp)
+  local
+    DAE.Exp e1, e2;
+    DAE.Operator op;
+    case DAE.BINARY(exp1 = e1,operator = op, exp2 = e2)
+    then simplifyBinary(inExp, op, e1, e2);
+
+    else inExp;
+  end match;
+end simplifyBinaryExp;
+
+public function simplifyUnaryExp
+  input DAE.Exp inExp;
+  output DAE.Exp outExp;
+algorithm
+  outExp := match(inExp)
+  local
+    DAE.Exp e1;
+    DAE.Operator op;
+    case DAE.UNARY(exp = e1,operator = op)
+    then simplifyUnary(inExp, op, e1);
+
+    else inExp;
+  end match;
+end simplifyUnaryExp;
 
 protected function simplifyWithOptions "Simplifies expressions"
   input DAE.Exp inExp;
@@ -403,7 +432,7 @@ algorithm
     // normal (pure) call
     case DAE.CALL(path=Absyn.IDENT(idn),expLst=expl, attr=DAE.CALL_ATTR(isImpure=false))
       equation
-        true = Expression.isConstWorkList(expl, true);
+        true = Expression.isConstWorkList(expl);
       then simplifyBuiltinConstantCalls(idn,inExp);
 
     // simplify some builtin calls, like cross, etc
@@ -845,7 +874,7 @@ protected function simplifyMatch "simplifies MetaModelica match expressions"
   input DAE.Exp exp;
   output DAE.Exp outExp;
 algorithm
-  outExp := matchcontinue exp
+  outExp := match exp
     local
       DAE.Exp e,e1,e2,e1_1,e2_1;
       Boolean b,b1,b2;
@@ -862,17 +891,18 @@ algorithm
     case DAE.MATCHEXPRESSION(inputs={}, et=ty, localDecls={}, cases={
         DAE.CASE(patterns={},localDecls={},body={},result=SOME(e))
       })
-      equation
-        false = Types.isTuple(ty);
+      guard
+        not Types.isTuple(ty)
       then e;
 
     case DAE.MATCHEXPRESSION(inputs={e}, et=ty, localDecls={}, cases={
         DAE.CASE(patterns={DAE.PAT_CONSTANT(exp=DAE.BCONST(b1))},localDecls={},body={},result=SOME(e1)),
         DAE.CASE(patterns={DAE.PAT_CONSTANT(exp=DAE.BCONST(b2))},localDecls={},body={},result=SOME(e2))
       })
+      guard
+        not boolEq(b1,b2) and
+        not Types.isTuple(ty)
       equation
-        false = boolEq(b1,b2);
-        false = Types.isTuple(ty);
         e1_1 = if b1 then e1 else e2;
         e2_1 = if b1 then e2 else e1;
         e = DAE.IFEXP(e, e1_1, e2_1);
@@ -882,15 +912,16 @@ algorithm
         DAE.CASE(patterns={DAE.PAT_CONSTANT(exp=DAE.BCONST(b1))},localDecls={},body={},result=SOME(e1)),
         DAE.CASE(patterns={DAE.PAT_WILD()},localDecls={},body={},result=SOME(e2))
       })
+      guard
+        not Types.isTuple(ty)
       equation
-        false = Types.isTuple(ty);
         e1_1 = if b1 then e1 else e2;
         e2_1 = if b1 then e2 else e1;
         e = DAE.IFEXP(e, e1_1, e2_1);
       then e;
 
      else exp;
-  end matchcontinue;
+  end match;
 end simplifyMatch;
 
 protected function simplifyCast "help function to simplify1"
@@ -1036,8 +1067,8 @@ algorithm
     // If the argument to min/max is an array, try to flatten it.
     case (DAE.CALL(path=Absyn.IDENT(name),expLst={e as DAE.ARRAY()},
         attr=DAE.CALL_ATTR(ty=tp)))
+      guard name=="max" or name=="min"
       equation
-        true = stringEq(name, "max") or stringEq(name, "min");
         expl = Expression.flattenArrayExpToList(e);
         e1 = Expression.makeScalarArray(expl, tp);
         false = Expression.expEqual(e, e1);
@@ -1045,7 +1076,14 @@ algorithm
         Expression.makePureBuiltinCall(name, {e1}, tp);
 
     // min/max function on arrays of only 1 element
-    case (DAE.CALL(path=Absyn.IDENT("min"),expLst={DAE.ARRAY(array={e})})) then e;
+    case (DAE.CALL(path=Absyn.IDENT(name),expLst={DAE.ARRAY(array=expl as {e})}))
+      guard name=="max" or name=="min"
+      algorithm
+        if Expression.isArrayType(Expression.typeof(e)) then
+          exp.expLst := expl;
+          e := exp;
+        end if;
+      then e;
     case (DAE.CALL(path=Absyn.IDENT("max"),expLst={DAE.ARRAY(array={e})})) then e;
 
     case (DAE.CALL(path=Absyn.IDENT("max"),expLst={DAE.ARRAY(array=es)},attr=DAE.CALL_ATTR(ty=tp)))
@@ -1519,31 +1557,12 @@ public function cevalBuiltinStringFormat
   input Boolean leftJustified;
   output String outString;
 algorithm
-  outString := matchcontinue(inString, stringLength, minLength, leftJustified)
-    local
-      String str;
-      Integer fill_size;
-    // The string is longer than the minimum length, do nothing.
-    case (_, _, _, _)
-      equation
-        true = stringLength >= minLength;
-      then
-        inString;
-    // leftJustified is false, append spaces at the beginning of the string.
-    case (_, _, _, false)
-      equation
-        fill_size = minLength - stringLength;
-        str = stringAppendList(List.fill(" ", fill_size)) + inString;
-      then
-        str;
-    // leftJustified is true, append spaces at the end of the string.
-    case (_, _, _, true)
-      equation
-        fill_size = minLength - stringLength;
-        str = inString + stringAppendList(List.fill(" ", fill_size));
-      then
-        str;
-  end matchcontinue;
+  outString := if stringLength >= minLength then inString
+    else
+      if leftJustified then
+        inString + stringAppendList(List.fill(" ", minLength - stringLength))
+      else
+        stringAppendList(List.fill(" ", minLength - stringLength)) + inString;
 end cevalBuiltinStringFormat;
 
 protected function simplifyStringAppendList

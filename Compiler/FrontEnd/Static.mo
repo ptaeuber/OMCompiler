@@ -34,7 +34,6 @@ encapsulated package Static
   package:     Static
   description: Static analysis of expressions
 
-  RCS: $Id$
 
   This module does static analysis on expressions.
   The analyzed expressions are built using the
@@ -626,13 +625,11 @@ algorithm
     (outCache, args, consts, _, tty, _, slots) := elabTypes(outCache, inEnv, pos_args,
       named_args, {tty}, true, true, inImplicit, NOT_EXTERNAL_OBJECT_MODEL_SCOPE(),
       NONE(), inPrefix, inInfo);
-
     if not Types.isFunctionPointer(tty) then
       (outCache, path) := Inst.makeFullyQualified(outCache, inEnv, path);
       (outCache, Util.SUCCESS()) := instantiateDaeFunction(outCache, inEnv,
         path, false, NONE(), true);
     end if;
-
     tty2 := stripExtraArgsFromType(slots, tty);
     tty2 := Types.makeFunctionPolymorphicReference(tty2);
     ty := Types.simplifyType(tty2);
@@ -1342,7 +1339,10 @@ algorithm
 
     // Figure out the type of the reduction.
     c := exp_const; // Types.constAnd(exp_const, iter_const);
-    fn := Absyn.crefToPath(inReductionFn);
+    fn := match inReductionFn
+      case Absyn.CREF_IDENT("$array",{}) then Absyn.IDENT("array");
+      else Absyn.crefToPath(inReductionFn);
+    end match;
     (outCache, exp, exp_ty, res_ty, v, fn) := reductionType(outCache, inEnv, fn,
       exp, exp_ty, Types.unboxedType(exp_ty), dims, has_guard_exp, inInfo);
     outProperties := DAE.PROP(exp_ty, c);
@@ -1730,6 +1730,7 @@ algorithm
       Absyn.ComponentRef cr, cr1, cr2;
       FCore.Graph env;
 
+    case Absyn.IDENT("$array") then (inEnv, NONE());
     case Absyn.IDENT("array") then (inEnv, NONE());
     case Absyn.IDENT("list") then (inEnv, NONE());
     case Absyn.IDENT("listReverse") then (inEnv, NONE());
@@ -1799,6 +1800,12 @@ algorithm
       Option<Values.Value> defaultBinding;
 
     case (Absyn.IDENT(name = "array"), _)
+      algorithm
+        ty := List.foldr(dims, Types.liftArray, inType);
+      then
+        (inExp, ty, ty, SOME(Values.ARRAY({},{0})), fn);
+
+    case (Absyn.IDENT(name = "$array"), _)
       algorithm
         ty := List.foldr(dims, Types.liftArray, inType);
       then
@@ -6229,6 +6236,12 @@ algorithm
     e := listHead(inPosArgs);
     (outCache, exp, DAE.PROP(ty, c), _) :=
       elabExpInExpression(inCache, inEnv, e, inImplicit, NONE(), true, inPrefix, inInfo);
+
+    if Types.isMetaBoxedType(ty) then
+      ty := Types.unboxedType(ty);
+      exp := DAE.UNBOX(exp, ty);
+    end if;
+
     val_slot := SLOT(DAE.FUNCARG("x", ty, DAE.C_VAR(), DAE.NON_PARALLEL(),
       NONE()), false, NONE(), {}, 1, SLOT_NOT_EVALUATED);
 
@@ -10200,7 +10213,7 @@ algorithm
 
       // Found a valid slot, fill it and reconstruct the slot list.
       slot := SLOT(DAE.FUNCARG(fa2, ty1, c2, prl, binding), true, SOME(inExp), inDims, idx, ses);
-      outSlotLst := listAppend(listReverse(outSlotLst), slot :: rest_slots);
+      outSlotLst := List.append_reverse(outSlotLst, slot :: rest_slots);
       return;
     end if;
 
@@ -12332,6 +12345,7 @@ algorithm
       DAE.Properties prop;
       DAE.Type ty;
       DAE.CodeType ct2;
+      Absyn.CodeNode cn;
 
     // first; try to elaborate the exp (maybe there is a binding in the environment that says v is a VariableName
     case (_,_)
@@ -12344,8 +12358,15 @@ algorithm
       then
         dexp;
 
+    case (Absyn.CODE(code=Absyn.C_MODIFICATION()),DAE.C_EXPRESSION_OR_MODIFICATION())
+      then DAE.CODE(exp.code,DAE.T_UNKNOWN_DEFAULT);
+    case (Absyn.CODE(code=Absyn.C_EXPRESSION()),DAE.C_EXPRESSION())
+      then DAE.CODE(exp.code,DAE.T_UNKNOWN_DEFAULT);
+
     // Expression
     case (_,DAE.C_EXPRESSION())
+      then DAE.CODE(Absyn.C_EXPRESSION(exp),DAE.T_UNKNOWN_DEFAULT);
+    case (_,DAE.C_EXPRESSION_OR_MODIFICATION())
       then DAE.CODE(Absyn.C_EXPRESSION(exp),DAE.T_UNKNOWN_DEFAULT);
 
     // Type Name

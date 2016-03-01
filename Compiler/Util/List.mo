@@ -34,7 +34,6 @@ encapsulated package List
   package:     List
   description: List functions
 
-  RCS: $Id$
 
   This package contains all functions that operate on the List type, such as
   mapping and filtering functions.
@@ -117,18 +116,28 @@ public function fill<T>
      Example: fill(2, 3) => {2, 2, 2}"
   input T inElement;
   input Integer inCount;
-  output list<T> outList;
+  output list<T> outList = {};
+protected
+  Integer i = 0;
 algorithm
-  outList := list(inElement for i in 1:inCount);
+  while i < inCount loop
+    outList := inElement :: outList;
+    i := i + 1;
+  end while;
 end fill;
 
 public function intRange
   "Returns a list of n integers from 1 to inStop.
      Example: listIntRange(3) => {1,2,3}"
   input Integer inStop;
-  output list<Integer> outRange;
+  output list<Integer> outRange = {};
+protected
+  Integer i = inStop;
 algorithm
-  outRange := list(i for i in 1:inStop);
+  while i > 0 loop
+    outRange := i :: outRange;
+    i := i - 1;
+  end while;
 end intRange;
 
 public function intRange2
@@ -136,12 +145,21 @@ public function intRange2
      Example listIntRange2(3,5) => {3,4,5}"
   input Integer inStart;
   input Integer inStop;
-  output list<Integer> outRange;
+  output list<Integer> outRange = {};
 protected
-  Integer step;
+  Integer i = inStop;
 algorithm
-  step := if inStart < inStop then 1 else -1;
-  outRange := list(i for i in inStart:step:inStop);
+  if inStart < inStop then
+    while i >= inStart loop
+      outRange := i :: outRange;
+      i := i - 1;
+    end while;
+  else
+    while i <= inStart loop
+      outRange := i :: outRange;
+      i := i + 1;
+    end while;
+  end if;
 end intRange2;
 
 public function intRange3
@@ -183,7 +201,7 @@ algorithm
       T e;
 
     case SOME(e) then {e};
-    case NONE() then {};
+    else {};
   end match;
 end fromOption;
 
@@ -380,6 +398,21 @@ algorithm
   end match;
 end appendNoCopy;
 
+public function append_reverse<T>
+  "Appends the elements from list1 in reverse order to list2."
+  input list<T> inList1;
+  input list<T> inList2;
+  output list<T> outList=inList2;
+algorithm
+  if listEmpty(outList) then
+    outList := listReverse(inList1);
+    return;
+  end if;
+  for e in inList1 loop
+    outList := e::outList;
+  end for;
+end append_reverse;
+
 public function appendr<T>
   "Appends two lists in reverse order compared to listAppend."
   input list<T> inList1;
@@ -409,6 +442,7 @@ algorithm
     local
       list<T> l;
       list<list<T>> ll;
+      list<list<T>> ol = {};
 
     case ({}, _) then {inList};
 
@@ -416,7 +450,14 @@ algorithm
       then {listAppend(l, inList)};
 
     case (l :: ll, _)
-      then l :: appendLastList(ll, inList);
+      algorithm
+        while not listEmpty(ll) loop
+          ol := l::ol;
+          l::ll := ll;
+        end while;
+        ol := listAppend(l, inList) :: ol;
+        outListList := listReverseInPlace(ol);
+      then ol;
 
   end match;
 end appendLastList;
@@ -476,9 +517,9 @@ algorithm
     case({},{},_,_)
       then inResultList;
     case({},_,_,_)
-      then listAppend(listReverse(inList2), inResultList);
+      then append_reverse(inList2, inResultList);
     case(_,{},_,_)
-      then listAppend(listReverse(inList), inResultList);
+      then append_reverse(inList, inResultList);
     case(listHead::listRest, listHead2::listRest2,_,_)
       equation
         if(inCompFunc(listHead, listHead2)) then
@@ -553,8 +594,12 @@ algorithm
       T e;
       list<T> rest;
 
-    case {e} then e;
-    case (_ :: rest) then last(rest);
+    case (e :: rest)
+      algorithm
+        while not listEmpty(rest) loop
+          e::rest := rest;
+        end while;
+      then e;
   end match;
 end last;
 
@@ -562,17 +607,13 @@ public function lastListOrEmpty<T>
   "Returns the last element(list) of a list of lists. Returns empty list
   if the outer list is empty."
   input list<list<T>> inListList;
-  output list<T> outLastList;
+  output list<T> outLastList = {};
+protected
+  list<list<T>> rest = inListList;
 algorithm
-  outLastList := match(inListList)
-    local
-      list<T> elist;
-      list<list<T>> restlist;
-
-    case {} then {};
-    case {elist} then elist;
-    case (_ :: restlist) then lastListOrEmpty(restlist);
-  end match;
+  while not listEmpty(rest) loop
+    outLastList :: rest := rest;
+  end while;
 end lastListOrEmpty;
 
 public function secondLast<T>
@@ -658,7 +699,11 @@ public function stripFirst<T>
   input list<T> inList;
   output list<T> outList;
 algorithm
-  outList := if listEmpty(inList) then {} else listRest(inList);
+  if listEmpty(inList) then
+    outList := {};
+  else
+    _::outList := inList;
+  end if;
 end stripFirst;
 
 public function stripLast<T>
@@ -902,8 +947,8 @@ algorithm
         merge(l_rest, r_rest, inCompFunc, el :: acc);
 
     case ({}, {}) then listReverseInPlace(acc);
-    case ({}, _) then listAppend(listReverseInPlace(acc),inRight);
-    case (_, {}) then listAppend(listReverseInPlace(acc),inLeft);
+    case ({}, _) then append_reverse(acc,inRight);
+    case (_, {}) then append_reverse(acc,inLeft);
 
   end match;
 end merge;
@@ -947,7 +992,7 @@ algorithm
 
   // Reverse accumulator and append the remaining elements.
   l1 := if listEmpty(l1) then l2 else l1;
-  outList := listAppend(listReverseInPlace(outList), l1);
+  outList := append_reverse(outList, l1);
 end mergeSorted;
 
 public function sortIntN
@@ -5531,7 +5576,7 @@ algorithm
     e :: rest := rest;
 
     if valueEq(e, inElement) then
-      outList := listAppend(listReverseInPlace(outList), rest);
+      outList := append_reverse(outList, rest);
       return;
     end if;
 
@@ -5575,7 +5620,7 @@ algorithm
     e :: rest := rest;
 
     if inCompareFunc(inValue, e) then
-      outList := listAppend(listReverseInPlace(acc), rest);
+      outList := append_reverse(acc, rest);
       outDeletedElement := SOME(e);
       return;
     end if;
@@ -5621,7 +5666,7 @@ algorithm
     i := i + 1;
   end for;
 
-  outList := listAppend(listReverseInPlace(outList), rest);
+  outList := append_reverse(outList, rest);
 end deletePositionsSorted;
 
 public function removeMatchesFirst
@@ -5664,7 +5709,7 @@ algorithm
   // Replace the element at the position and append the remaining elements.
   _ :: rest := rest;
   rest := inElement :: rest;
-  outList := listAppend(listReverseInPlace(outList), rest);
+  outList := append_reverse(outList, rest);
 end replaceAt;
 
 public function replaceOnTrue<T>
@@ -5690,7 +5735,7 @@ algorithm
 
     if inFunc(e) then
       outReplaced := true;
-      outList := listAppend(listReverseInPlace(outList), inReplacement :: rest);
+      outList := append_reverse(outList, inReplacement :: rest);
       return;
     end if;
 
@@ -5737,7 +5782,7 @@ algorithm
   // Replace the element at the position and append the remaining elements.
   _ :: rest := rest;
   rest := listAppend(inReplacementList, rest);
-  outList := listAppend(listReverseInPlace(outList), rest);
+  outList := append_reverse(outList, rest);
 end replaceAtWithList;
 
 public function replaceAtWithFill<T>

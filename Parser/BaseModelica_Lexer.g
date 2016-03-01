@@ -189,7 +189,7 @@ IDENT;
 
 @includes {
   #include "ModelicaParserCommon.h"
-  #include "runtime/errorext.h"
+  #include "errorext.h"
 }
 
 T_ALGORITHM : 'algorithm';
@@ -325,6 +325,7 @@ NL: '\r\n' | '\n' | '\r';
 CODE : '$Code';
 CODE_NAME : '$TypeName';
 CODE_EXP : '$Exp';
+CODE_ANNOTATION : '$annotation';
 CODE_VAR : '$Var';
 
 STRING : '"' STRING_GUTS '"'

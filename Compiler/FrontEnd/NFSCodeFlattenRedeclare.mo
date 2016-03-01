@@ -34,7 +34,6 @@ encapsulated package NFSCodeFlattenRedeclare
   package:     NFSCodeFlattenRedeclare
   description: SCode flattening
 
-  RCS: $Id: NFSCodeFlattenRedeclare.mo 25211 2015-03-23 09:47:31Z jansilar $
 
   This module contains redeclare-specific functions used by SCodeFlatten to
   handle redeclares. Redeclares can be either modifiers or elements.
@@ -584,7 +583,7 @@ algorithm
     case (_, _, NFSCodeEnv.PROCESSED_MODIFIER(modifier = item) :: rest_redecls)
         guard stringEqual(NFSCodeEnv.getItemName(item), inName)
       then
-        listAppend(listReverse(inOutRedeclares), NFSCodeEnv.PROCESSED_MODIFIER(inRedeclare) :: rest_redecls);
+        List.append_reverse(inOutRedeclares, NFSCodeEnv.PROCESSED_MODIFIER(inRedeclare) :: rest_redecls);
 
     case (_, _, redecl :: rest_redecls)
       then

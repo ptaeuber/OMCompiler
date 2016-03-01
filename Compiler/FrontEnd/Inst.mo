@@ -34,7 +34,6 @@ encapsulated package Inst
   package:     Inst
   description: Model instantiation
 
-  RCS: $Id: Inst.mo 25819 2015-04-29 11:33:05Z jansilar $
 
   This module is responsible for instantiation of Modelica models.
   The instantation is the process of instantiating model components,
@@ -4473,9 +4472,7 @@ end updateComponentInEnv3;
 
 public function makeEnvFromProgram
 "This function takes a SCode.Program and builds an environment."
-  input FCore.Cache inCache;
   input SCode.Program prog;
-  input SCode.Path path;
   output FCore.Cache outCache;
   output FCore.Graph env_1;
 protected
@@ -4483,7 +4480,7 @@ protected
   FCore.Cache cache;
 algorithm
   // prog := scodeFlatten(prog, path);
-  (cache, env) := Builtin.initialGraph(inCache);
+  (cache, env) := Builtin.initialGraph(FCore.emptyCache());
   env_1 := FGraphBuildEnv.mkProgramGraph(prog, FCore.USERDEFINED(),env);
   outCache := cache;
 end makeEnvFromProgram;

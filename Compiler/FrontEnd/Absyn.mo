@@ -35,7 +35,6 @@ encapsulated package Absyn
   package:     Absyn
   description: Abstract syntax
 
-  RCS: $Id: Absyn.mo 25819 2015-04-29 11:33:05Z jansilar $
 
   This file defines the abstract syntax for Modelica in MetaModelica Compiler (MMC).  It mainly
   contains uniontypes for constructing the abstract syntax tree
@@ -5501,7 +5500,7 @@ algorithm
       list<ElementItem> elts1,elts2;
     case (PUBLIC(elts1),elts2)
       equation
-        elts1 = List.filter(elts1,filterAnnotationItem);
+        elts1 = List.filterOnTrue(elts1,filterAnnotationItem);
       then listAppend(elts1,elts2);
     else elts;
   end match;
@@ -5509,8 +5508,12 @@ end getFunctionInterfaceParts;
 
 protected function filterAnnotationItem
   input ElementItem elt;
+  output Boolean outB;
 algorithm
-  ELEMENTITEM() := elt;
+  outB := match elt
+    case ELEMENTITEM() then true;
+    else false;
+  end match;
 end filterAnnotationItem;
 
 public function getExternalDecl
@@ -6707,6 +6710,26 @@ algorithm
     else false;
   end match;
 end isElementItemClass;
+
+public function isElementItem
+  input ElementItem inElement;
+  output Boolean outIsClass;
+algorithm
+  outIsClass := match inElement
+    case ELEMENTITEM() then true;
+    else false;
+  end match;
+end isElementItem;
+
+public function isAlgorithmItem
+  input AlgorithmItem inAlg;
+  output Boolean outIsClass;
+algorithm
+  outIsClass := match inAlg
+    case ALGORITHMITEM() then true;
+    else false;
+  end match;
+end isAlgorithmItem;
 
 public function isElementItemClassNamed
   input String inName;

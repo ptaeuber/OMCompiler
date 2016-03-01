@@ -34,7 +34,6 @@ encapsulated package SCode
   package:     SCode
   description: SCode intermediate form
 
-  RCS: $Id: SCode.mo 25211 2015-03-23 09:47:31Z jansilar $
 
   This module contains data structures to describe a Modelica
   model in a more convenient (canonical) way than the Absyn module does.
@@ -3143,6 +3142,16 @@ algorithm
   end match;
 end elementIsClass;
 
+public function elementIsImport
+  input Element inElement;
+  output Boolean outIsImport;
+algorithm
+  outIsImport := match inElement
+    case IMPORT() then true;
+    else false;
+  end match;
+end elementIsImport;
+
 public function elementIsPublicImport
   input Element el;
   output Boolean b;
@@ -3856,16 +3865,17 @@ public function removeBuiltinsFromTopScope
   input Program inProgram;
   output Program outProgram;
 algorithm
-  outProgram := List.filter(inProgram, isNotBuiltinClass);
+  outProgram := List.filterOnTrue(inProgram, isNotBuiltinClass);
 end removeBuiltinsFromTopScope;
 
 protected function isNotBuiltinClass
   input Element inClass;
+  output Boolean b;
 algorithm
-  _ := match(inClass)
+  b := match(inClass)
     case CLASS(classDef = PARTS(externalDecl =
-      SOME(EXTERNALDECL(lang = SOME("builtin"))))) then fail();
-    else ();
+      SOME(EXTERNALDECL(lang = SOME("builtin"))))) then false;
+    else true;
   end match;
 end isNotBuiltinClass;
 

@@ -34,7 +34,6 @@ encapsulated package NFSCodeEnv
   package:     NFSCodeEnv
   description: SCode flattening
 
-  RCS: $Id: NFSCodeEnv.mo 25211 2015-03-23 09:47:31Z jansilar $
 
   This module flattens the SCode representation by removing all extends, imports
   and redeclares, and fully qualifying class names.
@@ -2041,37 +2040,25 @@ public function avlTreeGet
   output AvlValue outValue;
 protected
   AvlKey rkey;
+  Integer sc;
+  AvlTree tree = inAvlTree;
 algorithm
-  AVLTREENODE(value = SOME(AVLTREEVALUE(key = rkey))) := inAvlTree;
-  outValue := avlTreeGet2(inAvlTree, stringCompare(inKey, rkey), inKey);
+  while true loop
+    AVLTREENODE(value = SOME(AVLTREEVALUE(key = rkey))) := tree;
+    sc := stringCompare(inKey, rkey);
+    if sc == 0 then
+      // Found match.
+      AVLTREENODE(value = SOME(AVLTREEVALUE(value = outValue))) := tree;
+      return;
+    elseif sc > 0 then
+      // Search to the right.
+      AVLTREENODE(right = SOME(tree)) := tree;
+    else
+      // Search to the left.
+      AVLTREENODE(left = SOME(tree)) := tree;
+    end if;
+  end while;
 end avlTreeGet;
-
-protected function avlTreeGet2
-  "Helper function to avlTreeGet."
-  input AvlTree inAvlTree;
-  input Integer inKeyComp;
-  input AvlKey inKey;
-  output AvlValue outValue;
-algorithm
-  outValue := match(inAvlTree, inKeyComp, inKey)
-    local
-      AvlKey key;
-      AvlValue rval;
-      AvlTree left, right;
-
-    // Found match.
-    case (AVLTREENODE(value = SOME(AVLTREEVALUE(value = rval))), 0, _)
-      then rval;
-
-    // Search to the right.
-    case (AVLTREENODE(right = SOME(right)), 1, key)
-      then avlTreeGet(right, key);
-
-    // Search to the left.
-    case (AVLTREENODE(left = SOME(left)), -1, key)
-      then avlTreeGet(left, key);
-  end match;
-end avlTreeGet2;
 
 public function avlTreeReplace
   "Replaces the value of an already existing node in the tree with a new value."
@@ -2144,8 +2131,8 @@ protected function createEmptyAvlIfNone
     output AvlTree outT;
 algorithm
   outT := match(t)
-    case (NONE()) then avlTreeNew();
     case (SOME(outT)) then outT;
+    else avlTreeNew();
   end match;
 end createEmptyAvlIfNone;
 
@@ -2163,16 +2150,13 @@ end balance;
 protected function doBalance
   "Performs balance if difference is > 1 or < -1"
   input Integer difference;
-  input AvlTree bt;
+  input AvlTree inBt;
   output AvlTree outBt;
 algorithm
-  outBt := match(difference, bt)
-    case(-1, _) then computeHeight(bt);
-    case( 0, _) then computeHeight(bt);
-    case( 1, _) then computeHeight(bt);
-    // d < -1 or d > 1
-    else doBalance2(difference < 0, bt);
-  end match;
+  outBt := if difference < -1 or difference > 1 then
+    doBalance2(difference < 0, inBt)
+  else
+    computeHeight(inBt);
 end doBalance;
 
 protected function doBalance2
@@ -2354,8 +2338,8 @@ protected function getHeight
   output Integer height;
 algorithm
   height := match(bt)
-    case(NONE()) then 0;
     case(SOME(AVLTREENODE(height = height))) then height;
+    else 0;
   end match;
 end getHeight;
 
