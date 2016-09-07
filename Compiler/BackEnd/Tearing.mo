@@ -3444,10 +3444,20 @@ protected function getNextSolvableEqn " finds equation that can be matched with 
   output list<Integer> eqnsOut;
   output list<Integer> varsOut;
 protected
+  Integer index;
   Boolean solvable = false;
 algorithm
   while not listEmpty(eqQueueOut) loop
-    eqOut::eqQueueOut := eqQueueOut;
+    // Get next equation
+    // eqOut::eqQueueOut := eqQueueOut;
+    // Get random equation
+    index := realInt(clock()*100);
+    index := mod(index, listLength(eqQueueOut)) + 1;
+    if Flags.isSet(Flags.TEARING_DUMP) or Flags.isSet(Flags.TEARING_DUMPVERBOSE) then
+      print("random equation index: " + intString(index) + "\n");
+    end if;
+    eqOut := listGet(eqQueueOut, index);
+    eqQueueOut := listDelete(eqQueueOut, index);
     (solvable, eqnsOut, varsOut) := eqnSolvableCheck(eqOut, mapEqnIncRow, ass1, m, me);
     if solvable then break; end if;
   end while;
