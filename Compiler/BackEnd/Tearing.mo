@@ -2840,7 +2840,7 @@ author: ptaeuber FHB 2013-2015"
   extends TearingHeuristic;
 protected
   Integer edges,maxpoints,tVar;
-  list<Integer> potentialTVars,bestPotentialTVars,assEq,assEq_multi,assEq_single,causEq,points,counts1,counts2;
+  list<Integer> potentialTVars,bestPotentialTVars,assEq,assEq_multi,assEq_single,causEq,points,counts1,counts2,maxPointsIndexes,causPoints,maxCausIndexes,maxCaus_map;
   BackendDAE.IncidenceMatrix mtsel,msel;
   constant Boolean debug = false;
 algorithm
@@ -2927,14 +2927,44 @@ algorithm
   end if;
   if debug then execStat("Tearing.ModifiedCellierHeuristic_3 - 5.5"); end if;
 
+
+  // HIER HACK
+  // potentialTVars := {8,7,6,5,4,3,2,1};
+  // counts1 := listReverse({2,3,1,1,3,3,2,2});
+  // counts2 := {3,2,2,2,2,2,1,3};
+  // points := {5,5,3,3,5,5,3,5};
+
   // 5. Choose vars with most points and save them in bestPotentialTVars
-  bestPotentialTVars := maxListInt(points);
-  maxpoints := listGet(points,listHead(bestPotentialTVars));
-  bestPotentialTVars := selectFromList(potentialTVars,bestPotentialTVars);
+  maxPointsIndexes := listReverse(maxListInt(points));
+  // HIER
+  // print("\nmaxPointsIndexes: "+ stringDelimitList(List.map(maxPointsIndexes,intString),",") + "\n");
+  bestPotentialTVars := selectFromList_rev(potentialTVars,maxPointsIndexes);
   if Flags.isSet(Flags.TEARING_DUMPVERBOSE) then
+    maxpoints := listGet(points,listHead(maxPointsIndexes));
     print("\n5th: "+ stringDelimitList(List.map(bestPotentialTVars,intString),",")+"\n(Variables from (4th) with most points [" + intString(maxpoints) + "])\n\n");
   end if;
   if debug then execStat("Tearing.ModifiedCellierHeuristic_3 - 6"); end if;
+
+  ////////////////////
+
+  // print("\ncounts1: "+ stringDelimitList(List.map(counts1,intString),",") + "\n");
+  causPoints := selectFromList(listReverse(counts1),maxPointsIndexes);
+  // HIER
+  // print("\ncausPoints: "+ stringDelimitList(List.map(causPoints,intString),",") + "\n");
+  maxCausIndexes := maxListInt(causPoints);
+  // print("\nmaxCausIndexes: "+ stringDelimitList(List.map(maxCausIndexes,intString),",") + "\n");
+  maxCaus_map := selectFromList(maxPointsIndexes,maxCausIndexes);
+  // print("\nmaxCaus_map: "+ stringDelimitList(List.map(maxCaus_map,intString),",") + "\n");
+  bestPotentialTVars := selectFromList_rev(potentialTVars,maxCaus_map);
+  // print("\nbestPotentialTVars: "+ stringDelimitList(List.map(bestPotentialTVars,intString),",") + "\n");
+
+  if Flags.isSet(Flags.TEARING_DUMPVERBOSE) then
+    maxpoints := listGet(causPoints,listHead(maxCausIndexes));
+    print("\n5.1th: "+ stringDelimitList(List.map(bestPotentialTVars,intString),",")+"\n(Variables from (5th) with most causalizable equations [" + intString(maxpoints) + "])\n\n");
+  end if;
+
+
+  ////////////////////
 
   // 6. Choose vars with most occurrence in equations as potentials
   mtsel := Array.select(mtIn,bestPotentialTVars);
@@ -2946,7 +2976,7 @@ algorithm
   potentials := selectFromList(bestPotentialTVars,potentials);
   tVar := listHead(potentials);
   if Flags.isSet(Flags.TEARING_DUMPVERBOSE) then
-    print("6th: "+ stringDelimitList(List.map(potentials,intString),",")+"\n(Variables from (5th) with most occurrence in equations (" + intString(edges) +" times))\n\nChosen tearing variable: " + intString(tVar) + "\n\n");
+    print("6th: "+ stringDelimitList(List.map(potentials,intString),",")+"\n(Variables from (5.1th) with most occurrence in equations (" + intString(edges) +" times))\n\nChosen tearing variable: " + intString(tVar) + "\n\n");
   end if;
   if listMember(tVar,tSel_avoid) then
     Error.addCompilerWarning("The Tearing heuristic has chosen variables with annotation attribute 'tearingSelect = avoid'. Use -d=tearingdump and -d=tearingdumpV for more information.");
