@@ -513,6 +513,8 @@ constant DebugFlag NF_UNITCHECK = DEBUG_FLAG(169, "frontEndUnitCheck", false,
   Util.gettext("Checks the consistency of units in equation."));
 constant DebugFlag DISABLE_COLORING = DEBUG_FLAG(170, "disableColoring", false,
   Util.gettext("Disables coloring algorithm while spasity detection."));
+constant DebugFlag IMPROVE_MC3 = DEBUG_FLAG(171, "improvemc3", false,
+  Util.gettext("Improve tearing heuristic MC3."));
 
 
 // This is a list of all debug flags, to keep track of which flags are used. A
@@ -690,7 +692,8 @@ constant list<DebugFlag> allDebugFlags = {
   PARTITION_INITIALIZATION,
   EVAL_PARAM_DUMP,
   NF_UNITCHECK,
-  DISABLE_COLORING
+  DISABLE_COLORING,
+  IMPROVE_MC3
 };
 
 public

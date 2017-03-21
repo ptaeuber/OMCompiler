@@ -2947,22 +2947,23 @@ algorithm
 
   ////////////////////
 
-  // print("\ncounts1: "+ stringDelimitList(List.map(counts1,intString),",") + "\n");
-  causPoints := selectFromList(listReverse(counts1),maxPointsIndexes);
-  // HIER
-  // print("\ncausPoints: "+ stringDelimitList(List.map(causPoints,intString),",") + "\n");
-  maxCausIndexes := maxListInt(causPoints);
-  // print("\nmaxCausIndexes: "+ stringDelimitList(List.map(maxCausIndexes,intString),",") + "\n");
-  maxCaus_map := selectFromList(maxPointsIndexes,maxCausIndexes);
-  // print("\nmaxCaus_map: "+ stringDelimitList(List.map(maxCaus_map,intString),",") + "\n");
-  bestPotentialTVars := selectFromList_rev(potentialTVars,maxCaus_map);
-  // print("\nbestPotentialTVars: "+ stringDelimitList(List.map(bestPotentialTVars,intString),",") + "\n");
+  if Flags.isSet(Flags.IMPROVE_MC3) then
+    // print("\ncounts1: "+ stringDelimitList(List.map(counts1,intString),",") + "\n");
+    causPoints := selectFromList(listReverse(counts1),maxPointsIndexes);
+    // HIER
+    // print("\ncausPoints: "+ stringDelimitList(List.map(causPoints,intString),",") + "\n");
+    maxCausIndexes := maxListInt(causPoints);
+    // print("\nmaxCausIndexes: "+ stringDelimitList(List.map(maxCausIndexes,intString),",") + "\n");
+    maxCaus_map := selectFromList(maxPointsIndexes,maxCausIndexes);
+    // print("\nmaxCaus_map: "+ stringDelimitList(List.map(maxCaus_map,intString),",") + "\n");
+    bestPotentialTVars := selectFromList_rev(potentialTVars,maxCaus_map);
+    // print("\nbestPotentialTVars: "+ stringDelimitList(List.map(bestPotentialTVars,intString),",") + "\n");
 
-  if Flags.isSet(Flags.TEARING_DUMPVERBOSE) then
-    maxpoints := listGet(causPoints,listHead(maxCausIndexes));
-    print("\n5.1th: "+ stringDelimitList(List.map(bestPotentialTVars,intString),",")+"\n(Variables from (5th) with most causalizable equations [" + intString(maxpoints) + "])\n\n");
+    if Flags.isSet(Flags.TEARING_DUMPVERBOSE) then
+      maxpoints := listGet(causPoints,listHead(maxCausIndexes));
+      print("\n5.1th: "+ stringDelimitList(List.map(bestPotentialTVars,intString),",")+"\n(Variables from (5th) with most causalizable equations [" + intString(maxpoints) + "])\n\n");
+    end if;
   end if;
-
 
   ////////////////////
 
