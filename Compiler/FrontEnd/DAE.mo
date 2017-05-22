@@ -414,7 +414,7 @@ public uniontype InlineType
   record EARLY_INLINE "Inline even earlier than NORM_INLINE. This will display the inlined code in the flattened model and also works for functions calling other functions that should be inlined."
   end EARLY_INLINE;
 
-  record DEFAULT_INLINE "no user option, tool can inline this functio if necessary"
+  record DEFAULT_INLINE "no user option, tool can inline this function if necessary"
   end DEFAULT_INLINE;
 
   record NO_INLINE "don't inline this function, set with Inline=false"

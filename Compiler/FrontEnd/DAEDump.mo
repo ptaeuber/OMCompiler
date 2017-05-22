@@ -1260,11 +1260,13 @@ public function dumpInlineTypeStr
   output String str;
 algorithm
   str := match(inlineType)
-    case(DAE.NO_INLINE()) then "\"Inline never\"";
-    case(DAE.AFTER_INDEX_RED_INLINE()) then " \"Inline after index reduction\"";
-    case(DAE.NORM_INLINE()) then " \"Inline before index reduction\"";
-    case(DAE.DEFAULT_INLINE()) then "\"Inline if necessary\"";
-    else "\"unknown\"";
+    case(DAE.DEFAULT_INLINE()) then "Default inlining - inline if necessary, no options given by the user";
+    case(DAE.NO_INLINE()) then "No inlining - inlining disabled by user";
+    case(DAE.BUILTIN_EARLY_INLINE()) then "Early builtin inlining - inline builtin functions even if inlining is globally disabled by flags";
+    case(DAE.EARLY_INLINE()) then "Early inlining - displays the inlined code in the flattened model";
+    case(DAE.NORM_INLINE()) then "Normal inlining - inline before index reduction";
+    case(DAE.AFTER_INDEX_RED_INLINE()) then "Late inlining - inline after index reduction";
+    else "*unknown*";
   end match;
 end dumpInlineTypeStr;
 
