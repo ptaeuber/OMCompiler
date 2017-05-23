@@ -44,6 +44,7 @@ import Absyn;
 import AvlSetPath;
 import BaseHashTable;
 import DAE;
+import DAEDump;
 import HashTableCG;
 import SCode;
 import Util;
@@ -831,12 +832,18 @@ algorithm
 
     case (e1 as DAE.CALL(p,args,DAE.CALL_ATTR(ty=ty,inlineType=inlineType)))
       equation
+        print("\nFound call " + ExpressionDump.printExpStr(e1) + "\n");
         //true = DAEUtil.convertInlineTypeToBool(inlineType);
         true = checkInlineType(inlineType,fns);
+        print("\ninline type is checked\n");
         (fn,comment) = getFunctionBody(p,fns);
         (checkcr,repl) = getInlineHashTableVarTransform();
+        print("\ncheckcr:\n");
+        BaseHashTable.dumpHashTable(checkcr);
+
         if (Config.acceptMetaModelicaGrammar())
         then // MetaModelica
+          print("\nMetaModelica Case\n");
           crefs = List.map(fn,getInputCrefs);
           crefs = List.select(crefs,removeWilds);
           argmap = List.threadTuple(crefs,args);
@@ -852,21 +859,45 @@ algorithm
           // for inlinecalls in functions
           (newExp1,assrtLst) = Expression.traverseExpBottomUp(newExp,function inlineCall(fns=fns),assrtLst);
         else // normal Modelica
+          print("\nNormal Modelica Case\n");
           // get inputs, body and output
           (crefs,lst_cr,stmts,repl) = getFunctionInputsOutputBody(fn,{},{},{},repl);
+          print("\ncref:\n");
+          ComponentReference.printComponentRefList(crefs);
+          print("\nlst_cr:\n");
+          ComponentReference.printComponentRefList(lst_cr);
+          print("stmts:\n" + DAEDump.ppStatementListStr(stmts));
+          VarTransform.dumpReplacements(repl);
+
           // merge statements to one line
           (repl,assrtStmts) = mergeFunctionBody(stmts,repl,{});
+          print("\nafter merging:\n");
+          print("assrtStmts:\n" + DAEDump.ppStatementListStr(assrtStmts));
+          VarTransform.dumpReplacements(repl);
+
           // depend on detection of assert or not
           if (listEmpty(assrtStmts))
           then // no assert detected
             // output
             newExp = Expression.makeTuple(list( getReplacementCheckComplex(repl,cr,ty) for cr in lst_cr));
+            print("\nnewExp: " + ExpressionDump.printExpStr(newExp) + "\n");
+
             // compare types
             true = checkExpsTypeEquiv(e1, newExp);
+            print("\nCompare types successful!\n");
+
             // input map cref again function args
             argmap = List.threadTuple(crefs,args);
+            print("\nargmap:\n");
+            dumpArgmapList(argmap);
+
             (checkcr,_) = getInlineHashTableVarTransform();
+            print("\n**unnecessary** checkcr:\n");
+            BaseHashTable.dumpHashTable(checkcr);
             (argmap,checkcr) = extendCrefRecords(argmap,checkcr);
+            print("\ncheckcr:\n");
+            BaseHashTable.dumpHashTable(checkcr);
+
             // add noEvent to avoid events as usually for functions
             // MSL 3.2.1 need GenerateEvents to disable this
             generateEvents = hasGenerateEventsAnnotation(comment);
@@ -949,6 +980,14 @@ algorithm
   (cr,exp) := inTpl;
   print(ComponentReference.printComponentRefStr(cr) + " -> " + ExpressionDump.printExpStr(exp) + "\n");
 end dumpArgmap;
+
+protected function dumpArgmapList
+  input list<tuple<DAE.ComponentRef, DAE.Exp>> inTplList;
+algorithm
+  for argmap in inTplList loop
+    dumpArgmap(argmap);
+  end for;
+end dumpArgmapList;
 
 public function forceInlineCall
 "replaces an inline call with the expression from the function"

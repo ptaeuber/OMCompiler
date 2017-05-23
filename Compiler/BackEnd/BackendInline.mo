@@ -70,7 +70,8 @@ public function lateInlineFunction
   input BackendDAE.BackendDAE inDAE;
   output BackendDAE.BackendDAE outDAE;
 algorithm
-  outDAE := inlineCalls({DAE.NORM_INLINE(), DAE.AFTER_INDEX_RED_INLINE()}, inDAE);
+  print("\n********************\nBegin the late inlining\n********************\n");
+  outDAE := inlineCallsBDAE({DAE.NORM_INLINE(), DAE.AFTER_INDEX_RED_INLINE()}, inDAE);
 end lateInlineFunction;
 
 // =============================================================================
@@ -81,8 +82,9 @@ public function normalInlineFunction
   input BackendDAE.BackendDAE inDAE;
   output BackendDAE.BackendDAE outDAE;
 algorithm
+  print("\n********************\nBegin the normal inlining\n********************\n");
   if Flags.getConfigEnum(Flags.INLINE_METHOD) == 1 then
-    outDAE := inlineCalls({DAE.NORM_INLINE()}, inDAE);
+    outDAE := inlineCallsBDAE({DAE.NORM_INLINE()}, inDAE);
   else
     outDAE := inlineCallsBDAE({DAE.NORM_INLINE()}, inDAE);
   end if;

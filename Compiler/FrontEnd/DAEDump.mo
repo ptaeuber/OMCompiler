@@ -1352,6 +1352,16 @@ algorithm
   str := ppStmtStr(alg, 2);
 end ppStatementStr;
 
+public function ppStatementListStr
+"Prettyprint an algorithm statement list to a string."
+  input list<DAE.Statement> alg;
+  output String str="";
+algorithm
+  for stmt in alg loop
+    str := str + ppStatementStr(stmt) + "\n";
+  end for;
+end ppStatementListStr;
+
 protected function ppStmt
 "Helper function to ppStatement."
   input DAE.Statement inStatement;

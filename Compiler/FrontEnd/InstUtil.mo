@@ -4671,6 +4671,7 @@ public function isInlineFunc
   input SCode.Element inClass;
   output DAE.InlineType outInlineType;
 algorithm
+  print("element: " + SCodeDump.shortElementStr(inClass) + "\n");
   outInlineType := matchcontinue(inClass)
     local
       list<SCode.SubMod> smlst;
@@ -4738,6 +4739,7 @@ algorithm
     end if;
 
   end for;
+  print("result: " + DAEDump.dumpInlineTypeStr(res) + "\n\n");
 end isInlineFunc2;
 
 public function stripFuncOutputsMod "strips the assignment modification of the component declared as output"
