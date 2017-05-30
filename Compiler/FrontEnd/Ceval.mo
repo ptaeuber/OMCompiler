@@ -1159,6 +1159,10 @@ algorithm
     case "Modelica.Utilities.Strings.substring" then cevalBuiltinSubstring;
     case "print" then cevalBuiltinPrint;
     case "fail" then cevalBuiltinFail;
+    case "cardinality"
+      equation
+        Error.addCompilerWarning("Deprecated builtin function cardinality detected. This is not fully supported in OpenModelica and may lead to problems.");
+     then fail();
     // BTH
     /*
     case "Clock"
