@@ -375,6 +375,7 @@ uniontype LinearSystem
   record LINEARSYSTEM
     Integer index;
     Boolean partOfMixed;
+    Boolean tornSystem;
     list<SimCodeVar.SimVar> vars;
     list<DAE.Exp> beqs;
     list<tuple<Integer, Integer, SimEqSystem>> simJac;
@@ -396,6 +397,7 @@ uniontype NonlinearSystem
     Option<JacobianMatrix> jacobianMatrix;
     Boolean homotopySupport;
     Boolean mixedSystem;
+    Boolean tornSystem;
   end NONLINEARSYSTEM;
 end NonlinearSystem;
 
