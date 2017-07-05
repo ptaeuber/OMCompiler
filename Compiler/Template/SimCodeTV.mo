@@ -497,6 +497,7 @@ package SimCode
       Option<JacobianMatrix> jacobianMatrix;
       list<DAE.ElementSource> sources;
       Integer indexLinearSystem;
+      Integer nUnknowns;
     end LINEARSYSTEM;
   end LinearSystem;
 
@@ -506,6 +507,7 @@ package SimCode
       list<SimEqSystem> eqs;
       list<DAE.ComponentRef> crefs;
       Integer indexNonLinearSystem;
+      Integer nUnknowns;
       Option<JacobianMatrix> jacobianMatrix;
       Boolean homotopySupport;
       Boolean mixedSystem;

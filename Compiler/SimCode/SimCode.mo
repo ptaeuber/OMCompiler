@@ -384,6 +384,7 @@ uniontype LinearSystem
     Option<JacobianMatrix> jacobianMatrix;
     list<DAE.ElementSource> sources;
     Integer indexLinearSystem;
+    Integer nUnknowns "Number of variables that are solved in this system. Needed because 'crefs' only contains the iteration variables.";
   end LINEARSYSTEM;
 end LinearSystem;
 
@@ -394,6 +395,7 @@ uniontype NonlinearSystem
     list<SimEqSystem> eqs;
     list<DAE.ComponentRef> crefs;
     Integer indexNonLinearSystem;
+    Integer nUnknowns "Number of variables that are solved in this system. Needed because 'crefs' only contains the iteration variables.";
     Option<JacobianMatrix> jacobianMatrix;
     Boolean homotopySupport;
     Boolean mixedSystem;
