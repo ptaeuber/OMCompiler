@@ -5855,5 +5855,26 @@ algorithm
   end match;
 end replaceHomotopyWithLambdaExpression;
 
+// =============================================================================
+// section for initOptModule >>generateHomotopyComponents<<
+//
+// =============================================================================
+
+public function generateHomotopyComponents
+  input BackendDAE.BackendDAE inDAE;
+  output BackendDAE.BackendDAE outDAE = inDAE;
+protected
+  BackendDAE.EquationArray orderedEqs;
+  BackendDAE.Variables orderedVars;
+  Boolean foundHomotopy;
+algorithm
+  print("\nIn generateHomotopyComponents\n");
+  for syst in inDAE.eqs loop
+    orderedEqs := syst.orderedEqs;
+    (orderedEqs, foundHomotopy) := BackendEquation.traverseEquationArray_WithUpdate(orderedEqs, inlineHomotopy2, false);
+    syst.orderedEqs := orderedEqs;
+  end for;
+end generateHomotopyComponents;
+
 annotation(__OpenModelica_Interface="backend");
 end BackendDAEOptimize;

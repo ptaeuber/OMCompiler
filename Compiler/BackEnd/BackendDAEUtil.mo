@@ -7568,15 +7568,17 @@ end allPostOptimizationModules;
 protected function allInitOptimizationModules
   "This list contains all back end init-optimization modules."
   output list<tuple<BackendDAEFunc.optimizationModule, String>> allInitOptimizationModules = {
+    (Initialization.replaceHomotopyWithSimplified, "replaceHomotopyWithSimplified"),
     (SymbolicJacobian.constantLinearSystem, "constantLinearSystem"),
     (BackendDAEOptimize.inlineHomotopy, "inlineHomotopy"),
     (BackendDAEOptimize.inlineFunctionInLoops, "forceInlineFunctionInLoops"), // before simplifyComplexFunction
     (BackendDAEOptimize.simplifyComplexFunction, "simplifyComplexFunction"),
-  (CommonSubExpression.wrapFunctionCalls, "wrapFunctionCalls"),
+    (CommonSubExpression.wrapFunctionCalls, "wrapFunctionCalls"),
     (DynamicOptimization.reduceDynamicOptimization, "reduceDynamicOptimization"), // before tearing
     (Tearing.tearingSystem, "tearingSystem"),
     (BackendDAEOptimize.simplifyLoops, "simplifyLoops"),
     (Tearing.recursiveTearing, "recursiveTearing"),
+    (BackendDAEOptimize.generateHomotopyComponents, "generateHomotopyComponents"), // after tearing, before calculateStrongComponentJacobians
     (SymbolicJacobian.calculateStrongComponentJacobians, "calculateStrongComponentJacobians"),
     (ExpressionSolve.solveSimpleEquations, "solveSimpleEquations"),
     (BackendDAEOptimize.simplifyAllExpressions, "simplifyAllExpressions"),
@@ -7775,6 +7777,8 @@ end getPostOptModules;
 
 public function getInitOptModules
   input Option<list<String>> inInitOptModules;
+  input list<String> inEnabledModules = {};
+  input list<String> inDisabledModules = {};
   output list<tuple<BackendDAEFunc.optimizationModule, String>> outInitOptModules;
 protected
   list<String> initOptModules;
@@ -7813,6 +7817,8 @@ algorithm
   end if;
 
   outInitOptModules := selectOptModules(initOptModules, enabledModules, disabledModules, allInitOptimizationModules());
+  initOptModules := List.map(outInitOptModules, Util.tuple22);
+  outInitOptModules := selectOptModules(initOptModules, inEnabledModules, inDisabledModules, allInitOptimizationModules());
 end getInitOptModules;
 
 protected function selectOptModules
