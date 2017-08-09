@@ -5860,21 +5860,315 @@ end replaceHomotopyWithLambdaExpression;
 //
 // =============================================================================
 
-public function generateHomotopyComponents
+public function generateHomotopyComponents " finds the smallest homotopy loop and creates a component out of it
+  author: ptaeuber 2017"
   input BackendDAE.BackendDAE inDAE;
   output BackendDAE.BackendDAE outDAE = inDAE;
 protected
-  BackendDAE.EquationArray orderedEqs;
-  BackendDAE.Variables orderedVars;
-  Boolean foundHomotopy;
+  BackendDAE.StrongComponents comps;
+  array<Integer> ass1, ass2;
 algorithm
   print("\nIn generateHomotopyComponents\n");
   for syst in inDAE.eqs loop
-    orderedEqs := syst.orderedEqs;
-    (orderedEqs, foundHomotopy) := BackendEquation.traverseEquationArray_WithUpdate(orderedEqs, inlineHomotopy2, false);
-    syst.orderedEqs := orderedEqs;
+    BackendDAE.MATCHING(ass1=ass1, ass2=ass2, comps=comps) := syst.matching;
+    comps := traverseStrongComponentsForHomotopyLoop(comps, syst);
+    syst.matching := BackendDAE.MATCHING(ass1=ass1, ass2=ass2, comps=comps);
   end for;
 end generateHomotopyComponents;
+
+protected function traverseStrongComponentsForHomotopyLoop " traverses all the strong components and finds the smallest homotopy loop
+  author: ptaeuber 2017"
+  input output BackendDAE.StrongComponents comps;
+  input BackendDAE.EqSystem inSystem;
+protected
+  Integer nComps, compIndex=0, homotopyLoopBeginning=0, homotopyLoopEnd=0;
+  BackendDAE.StrongComponents preHomotopyComponents, homotopyComponents, postHomotopyComponents;
+  BackendDAE.StrongComponent homotopyComponent;
+algorithm
+  print("\nIn traverseStrongComponentsForHomotopyLoop\n");
+  nComps := listLength(comps);
+  for comp in comps loop
+    compIndex := compIndex + 1;
+    print("\nComponent: " + intString(compIndex));
+    _ := match(comp)
+      local
+        Integer eqnIndex, varIndex;
+        list<Integer> eqnIndexes, varIndexes, resEqnIndexes, tVarIndexes, innerEqnIndexes;
+        list<list<Integer>> innerVarIndexesLst;
+        BackendDAE.InnerEquations innerEquations;
+        BackendDAE.Equation eqn;
+        list<BackendDAE.Equation> eqnLst;
+        Boolean hasHomotopy;
+
+      case(BackendDAE.SINGLEEQUATION(eqn=eqnIndex, var=varIndex))
+        equation
+          print("\nCase SINGLEEQUATION\n");
+          eqn = BackendEquation.get(inSystem.orderedEqs, eqnIndex);
+          (_, hasHomotopy) = BackendEquation.traverseExpsOfEquation(eqn, BackendDAEUtil.containsHomotopyCall, false);
+          if hasHomotopy then
+            homotopyLoopEnd = compIndex;
+            if (homotopyLoopBeginning == 0) then
+              homotopyLoopBeginning = compIndex;
+              print("\nHomotopy loop begins\n");
+            end if;
+            print("\nHomotopy loop ends\n");
+          end if;
+      then();
+
+      case(BackendDAE.EQUATIONSYSTEM(eqns=eqnIndexes, vars=varIndexes))
+        equation
+          print("\nCase EQUATIONSYSTEM\n");
+          if (homotopyLoopBeginning == 0) then
+            eqnLst = BackendEquation.getList(eqnIndexes, inSystem.orderedEqs);
+            (_, hasHomotopy) = BackendEquation.traverseExpsOfEquationList(eqnLst, BackendDAEUtil.containsHomotopyCall, false);
+
+            if hasHomotopy then
+              homotopyLoopBeginning = compIndex;
+              homotopyLoopEnd = compIndex;
+              print("\nHomotopy loop begins\n");
+              print("\nHomotopy loop ends\n");
+            end if;
+          else
+            homotopyLoopEnd = compIndex;
+            print("\nHomotopy loop ends\n");
+          end if;
+      then();
+
+      case(BackendDAE.SINGLEARRAY(eqn=eqnIndex, vars=varIndexes))
+        equation
+          print("\nCase SINGLEARRAY\n");
+          eqn = BackendEquation.get(inSystem.orderedEqs, eqnIndex);
+          (_, hasHomotopy) = BackendEquation.traverseExpsOfEquation(eqn, BackendDAEUtil.containsHomotopyCall, false);
+
+          if hasHomotopy then
+            homotopyLoopEnd = compIndex;
+            if (homotopyLoopBeginning == 0) then
+              homotopyLoopBeginning = compIndex;
+              print("\nHomotopy loop begins\n");
+            end if;
+            print("\nHomotopy loop ends\n");
+          end if;
+      then();
+
+      case(BackendDAE.SINGLEALGORITHM(eqn=eqnIndex, vars=varIndexes))
+        equation
+          print("\nCase SINGLEALGORITHM\n");
+          eqn = BackendEquation.get(inSystem.orderedEqs, eqnIndex);
+          (_, hasHomotopy) = BackendEquation.traverseExpsOfEquation(eqn, BackendDAEUtil.containsHomotopyCall, false);
+
+          if hasHomotopy then
+            homotopyLoopEnd = compIndex;
+            if (homotopyLoopBeginning == 0) then
+              homotopyLoopBeginning = compIndex;
+              print("\nHomotopy loop begins\n");
+            end if;
+            print("\nHomotopy loop ends\n");
+          end if;
+      then();
+
+      case(BackendDAE.SINGLECOMPLEXEQUATION(eqn=eqnIndex, vars=varIndexes))
+        equation
+          print("\nCase SINGLECOMPLEXEQUATION\n");
+          eqn = BackendEquation.get(inSystem.orderedEqs, eqnIndex);
+          (_, hasHomotopy) = BackendEquation.traverseExpsOfEquation(eqn, BackendDAEUtil.containsHomotopyCall, false);
+
+          if hasHomotopy then
+            homotopyLoopEnd = compIndex;
+            if (homotopyLoopBeginning == 0) then
+              homotopyLoopBeginning = compIndex;
+              print("\nHomotopy loop begins\n");
+            end if;
+            print("\nHomotopy loop ends\n");
+          end if;
+      then();
+
+      case(BackendDAE.SINGLEWHENEQUATION(eqn=eqnIndex, vars=varIndexes))
+        equation
+          print("\nCase SINGLEWHENEQUATION\n");
+          eqn = BackendEquation.get(inSystem.orderedEqs, eqnIndex);
+          (_, hasHomotopy) = BackendEquation.traverseExpsOfEquation(eqn, BackendDAEUtil.containsHomotopyCall, false);
+
+          if hasHomotopy then
+            homotopyLoopEnd = compIndex;
+            if (homotopyLoopBeginning == 0) then
+              homotopyLoopBeginning = compIndex;
+              print("\nHomotopy loop begins\n");
+            end if;
+            print("\nHomotopy loop ends\n");
+          end if;
+      then();
+
+      case(BackendDAE.SINGLEIFEQUATION(eqn=eqnIndex, vars=varIndexes))
+        equation
+          print("\nCase SINGLEIFEQUATION\n");
+          eqn = BackendEquation.get(inSystem.orderedEqs, eqnIndex);
+          (_, hasHomotopy) = BackendEquation.traverseExpsOfEquation(eqn, BackendDAEUtil.containsHomotopyCall, false);
+
+          if hasHomotopy then
+            homotopyLoopEnd = compIndex;
+            if (homotopyLoopBeginning == 0) then
+              homotopyLoopBeginning = compIndex;
+              print("\nHomotopy loop begins\n");
+            end if;
+            print("\nHomotopy loop ends\n");
+          end if;
+      then();
+
+      case(BackendDAE.TORNSYSTEM(strictTearingSet=BackendDAE.TEARINGSET(residualequations=resEqnIndexes, tearingvars=tVarIndexes, innerEquations=innerEquations)))
+        equation
+          print("\nCase TORNSYSTEM\n");
+          if (homotopyLoopBeginning == 0) then
+            eqnLst = BackendEquation.getList(resEqnIndexes, inSystem.orderedEqs);
+            (_, hasHomotopy) = BackendEquation.traverseExpsOfEquationList(eqnLst, BackendDAEUtil.containsHomotopyCall, false);
+
+            if not hasHomotopy then
+              (innerEqnIndexes, innerVarIndexesLst,_) = List.map_3(innerEquations, BackendDAEUtil.getEqnAndVarsFromInnerEquation);
+              eqnLst = BackendEquation.getList(innerEqnIndexes, inSystem.orderedEqs);
+              (_, hasHomotopy) = BackendEquation.traverseExpsOfEquationList(eqnLst, BackendDAEUtil.containsHomotopyCall, false);
+            end if;
+
+            if hasHomotopy then
+              homotopyLoopBeginning = compIndex;
+              homotopyLoopEnd = compIndex;
+              print("\nHomotopy loop begins\n");
+              print("\nHomotopy loop ends\n");
+            end if;
+          else
+            homotopyLoopEnd = compIndex;
+            print("\nHomotopy loop ends\n");
+          end if;
+      then();
+    end match;
+  end for;
+
+  print("\n\nHomotopy start component: " + intString(homotopyLoopBeginning) + "\n");
+  print("Homotopy end component: " + intString(homotopyLoopEnd) + "\n");
+
+  (preHomotopyComponents, homotopyComponents, postHomotopyComponents) := getHomotopyComponents(List.intRange(nComps), comps, homotopyLoopBeginning, homotopyLoopEnd);
+
+  print("\nPre homotopy loop:");
+  BackendDump.dumpComponents(preHomotopyComponents);
+  print("\nHomotopy loop:");
+  BackendDump.dumpComponents(homotopyComponents);
+  print("\nPost homotopy loop:");
+  BackendDump.dumpComponents(postHomotopyComponents);
+
+  homotopyComponent := createOneHomotopyComponent(homotopyComponents, inSystem);
+end traverseStrongComponentsForHomotopyLoop;
+
+
+protected function getHomotopyComponents " divides the components into pre-homotopy, homotopy and post-homotopy parts
+  author: ptaeuber 2017"
+  input list<Integer> componentIndexes;
+  input BackendDAE.StrongComponents components;
+  input Integer homotopyLoopBeginning;
+  input Integer homotopyLoopEnd;
+  input output BackendDAE.StrongComponents outPreHomotopyComponents = {};
+  input output BackendDAE.StrongComponents outHomotopyComponents = {};
+  input output BackendDAE.StrongComponents outPostHomotopyComponents = {};
+algorithm
+  (outPreHomotopyComponents, outHomotopyComponents, outPostHomotopyComponents) := match(componentIndexes, components)
+    local
+      Integer i;
+      list<Integer> indexes;
+      BackendDAE.StrongComponent comp;
+      BackendDAE.StrongComponents comps;
+
+    case(i::{}, comp::{})
+      equation
+        if intLt(i, homotopyLoopBeginning) then
+          outPreHomotopyComponents = comp::outPreHomotopyComponents;
+        elseif intGt(i, homotopyLoopEnd) then
+          outPostHomotopyComponents = comp::outPostHomotopyComponents;
+        else
+          outHomotopyComponents = comp::outHomotopyComponents;
+        end if;
+    then (listReverse(outPreHomotopyComponents), listReverse(outHomotopyComponents), listReverse(outPostHomotopyComponents));
+
+    case(i::indexes, comp::comps)
+      equation
+        if intLt(i, homotopyLoopBeginning) then
+          outPreHomotopyComponents = comp::outPreHomotopyComponents;
+        elseif intGt(i, homotopyLoopEnd) then
+          outPostHomotopyComponents = comp::outPostHomotopyComponents;
+        else
+          outHomotopyComponents = comp::outHomotopyComponents;
+        end if;
+    then getHomotopyComponents(indexes, comps, homotopyLoopBeginning, homotopyLoopEnd, outPreHomotopyComponents, outHomotopyComponents, outPostHomotopyComponents);
+  end match;
+end getHomotopyComponents;
+
+protected function createOneHomotopyComponent " creates one BackendDAE.TORNSYSTEM out of all homotopy components
+  author: ptaeuber"
+  input BackendDAE.StrongComponents homotopyComponents;
+  input BackendDAE.EqSystem inSystem;
+  output BackendDAE.StrongComponent outHomotopyComponent;
+algorithm
+  print("\nIn createOneHomotopyComponent\n");
+  for comp in homotopyComponents loop
+    _ := match(comp)
+      local
+        Integer eqnIndex, varIndex;
+        list<Integer> eqnIndexes, varIndexes, resEqnIndexes, tVarIndexes, innerEqnIndexes;
+        list<list<Integer>> innerVarIndexesLst;
+        BackendDAE.InnerEquations innerEquations;
+        BackendDAE.Equation eqn;
+        list<BackendDAE.Equation> eqnLst;
+
+      case(BackendDAE.SINGLEEQUATION(eqn=eqnIndex, var=varIndex))
+        equation
+          print("\nCase SINGLEEQUATION\n");
+          eqn = BackendEquation.get(inSystem.orderedEqs, eqnIndex);
+      then();
+
+      case(BackendDAE.EQUATIONSYSTEM(eqns=eqnIndexes, vars=varIndexes))
+        equation
+          print("\nCase EQUATIONSYSTEM\n");
+          eqnLst = BackendEquation.getList(eqnIndexes, inSystem.orderedEqs);
+      then();
+
+      case(BackendDAE.SINGLEARRAY(eqn=eqnIndex, vars=varIndexes))
+        equation
+          print("\nCase SINGLEARRAY\n");
+          eqn = BackendEquation.get(inSystem.orderedEqs, eqnIndex);
+      then();
+
+      case(BackendDAE.SINGLEALGORITHM(eqn=eqnIndex, vars=varIndexes))
+        equation
+          print("\nCase SINGLEALGORITHM\n");
+          eqn = BackendEquation.get(inSystem.orderedEqs, eqnIndex);
+      then();
+
+      case(BackendDAE.SINGLECOMPLEXEQUATION(eqn=eqnIndex, vars=varIndexes))
+        equation
+          print("\nCase SINGLECOMPLEXEQUATION\n");
+          eqn = BackendEquation.get(inSystem.orderedEqs, eqnIndex);
+      then();
+
+      case(BackendDAE.SINGLEWHENEQUATION(eqn=eqnIndex, vars=varIndexes))
+        equation
+          print("\nCase SINGLEWHENEQUATION\n");
+          eqn = BackendEquation.get(inSystem.orderedEqs, eqnIndex);
+      then();
+
+      case(BackendDAE.SINGLEIFEQUATION(eqn=eqnIndex, vars=varIndexes))
+        equation
+          print("\nCase SINGLEIFEQUATION\n");
+          eqn = BackendEquation.get(inSystem.orderedEqs, eqnIndex);
+      then();
+
+      case(BackendDAE.TORNSYSTEM(strictTearingSet=BackendDAE.TEARINGSET(residualequations=resEqnIndexes, tearingvars=tVarIndexes, innerEquations=innerEquations)))
+        equation
+          print("\nCase TORNSYSTEM\n");
+          eqnLst = BackendEquation.getList(resEqnIndexes, inSystem.orderedEqs);
+          (innerEqnIndexes, innerVarIndexesLst,_) = List.map_3(innerEquations, BackendDAEUtil.getEqnAndVarsFromInnerEquation);
+          eqnLst = BackendEquation.getList(innerEqnIndexes, inSystem.orderedEqs);
+      then();
+    end match;
+  end for;
+
+  outHomotopyComponent := BackendDAE.SINGLEEQUATION(0, 0);
+end createOneHomotopyComponent;
 
 annotation(__OpenModelica_Interface="backend");
 end BackendDAEOptimize;

@@ -95,6 +95,7 @@ protected
   BackendDAE.Variables vars, fixvars;
   Boolean b, b1, b2, useHomotopy;
   String msg;
+  list<String> disabledModules;
   HashSet.HashSet hs "contains all pre variables";
   list<BackendDAE.Equation> removedEqns;
   list<BackendDAE.Var> dumpVars, dumpVars2, outAllPrimaryParameters;
@@ -220,7 +221,14 @@ algorithm
     if not stringEq(Config.simCodeTarget(), "Cpp") then
       initdae := BackendDAEUtil.setDAEGlobalKnownVars(initdae, outGlobalKnownVars);
     end if;
-    initOptModules := BackendDAEUtil.getInitOptModules(NONE());
+
+    if useHomotopy then
+      disabledModules := {};
+    else
+      disabledModules := {"inlineHomotopy", "generateHomotopyComponents"};
+    end if;
+
+    initOptModules := BackendDAEUtil.getInitOptModules(NONE(), {}, disabledModules);
     matchingAlgorithm := BackendDAEUtil.getMatchingAlgorithm(NONE());
     daeHandler := BackendDAEUtil.getIndexReductionMethod(SOME("none"));
     initdae := BackendDAEUtil.postOptimizeDAE(initdae, initOptModules, matchingAlgorithm, daeHandler);

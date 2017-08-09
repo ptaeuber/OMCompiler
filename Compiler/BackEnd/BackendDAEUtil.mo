@@ -9295,5 +9295,39 @@ algorithm
   end for;
 end warnAboutIterationVariablesWithNoNominal;
 
+public function containsHomotopyCall
+  input DAE.Exp inExp;
+  input Boolean inHomotopy;
+  output DAE.Exp outExp;
+  output Boolean outHomotopy;
+protected
+  Boolean b;
+algorithm
+  (outExp, outHomotopy) := Expression.traverseExpTopDown(inExp, containsHomotopyCall2, inHomotopy);
+end containsHomotopyCall;
+
+protected function containsHomotopyCall2
+  input DAE.Exp inExp;
+  input Boolean inHomotopy;
+  output DAE.Exp outExp = inExp;
+  output Boolean cont;
+  output Boolean outHomotopy;
+protected
+  Boolean b;
+algorithm
+  (outExp, outHomotopy, cont) := match(inExp, inHomotopy)
+    case (_, true)
+     then (inExp, true, false);
+
+    case (DAE.CALL(path=Absyn.IDENT(name="homotopy")), _)
+     then (inExp, true, false);
+
+    case (DAE.CREF(componentRef=DAE.CREF_IDENT(ident=BackendDAE.homotopyLambda)), _)
+     then (inExp, true, false);
+
+    else (inExp, inHomotopy, true);
+  end match;
+end containsHomotopyCall2;
+
 annotation(__OpenModelica_Interface="backend");
 end BackendDAEUtil;
