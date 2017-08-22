@@ -9295,6 +9295,18 @@ algorithm
   end for;
 end warnAboutIterationVariablesWithNoNominal;
 
+public function getLinearfromJacType "  author: Frenkel TUD 2012-09"
+  input BackendDAE.JacobianType jacType;
+  output Boolean linear;
+algorithm
+  linear := match(jacType)
+    case (BackendDAE.JAC_CONSTANT()) then true;
+    case (BackendDAE.JAC_LINEAR()) then true;
+    case (BackendDAE.JAC_NONLINEAR()) then false;
+    case (BackendDAE.JAC_NO_ANALYTIC()) then false;
+  end match;
+end getLinearfromJacType;
+
 public function containsHomotopyCall
   input DAE.Exp inExp;
   input Boolean inHomotopy;
