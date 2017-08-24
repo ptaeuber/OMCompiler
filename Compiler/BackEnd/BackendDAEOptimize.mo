@@ -6118,6 +6118,9 @@ protected
   list<Integer> newIterationVars = {};
   Boolean isLinear = true;
   Boolean isMixed = false;
+  // DELETEME
+  list<BackendDAE.Var> var_lst;
+  BackendDAE.Variables vars;
 algorithm
   print("\nIn createOneHomotopyComponent\n");
   for comp in homotopyComponents loop
@@ -6139,6 +6142,10 @@ algorithm
       case(BackendDAE.EQUATIONSYSTEM(eqns=eqnIndexes, vars=varIndexes, jacType=jacType, mixedSystem=mixedSystem))
         equation
           print("\nCase EQUATIONSYSTEM\n");
+          var_lst = List.map1r(varIndexes, BackendVariable.getVarAt, BackendVariable.daeVars(inSystem));
+          vars = BackendVariable.listVar1(var_lst);
+          BackendDump.dumpVariables(vars, "equation system vars");
+
           linear = BackendDAEUtil.getLinearfromJacType(jacType);
           if not linear then
             isLinear = false;
@@ -6181,6 +6188,9 @@ algorithm
       case(BackendDAE.TORNSYSTEM(strictTearingSet=BackendDAE.TEARINGSET(residualequations=resEqnIndexes, tearingvars=tVarIndexes, innerEquations=innerEquations), linear=linear, mixedSystem=mixedSystem))
         algorithm
           print("\nCase TORNSYSTEM\n");
+          var_lst := List.map1r(tVarIndexes, BackendVariable.getVarAt, BackendVariable.daeVars(inSystem));
+          vars := BackendVariable.listVar1(var_lst);
+          BackendDump.dumpVariables(vars, "torn system vars");
           if not linear then
             isLinear := false;
           end if;
@@ -6194,7 +6204,11 @@ algorithm
     end match;
   end for;
 
-  outHomotopyComponent := BackendDAE.TORNSYSTEM(BackendDAE.TEARINGSET(newResEquations, newIterationVars, listReverse(newInnerEquations), BackendDAE.EMPTY_JACOBIAN()), NONE(), isLinear, isMixed);
+  var_lst := List.map1r(newIterationVars, BackendVariable.getVarAt, BackendVariable.daeVars(inSystem));
+  vars := BackendVariable.listVar1(var_lst);
+  BackendDump.dumpVariables(vars, "newIterationVars");
+
+  outHomotopyComponent := BackendDAE.TORNSYSTEM(BackendDAE.TEARINGSET(newIterationVars, newResEquations, listReverse(newInnerEquations), BackendDAE.EMPTY_JACOBIAN()), NONE(), isLinear, isMixed);
 end createOneHomotopyComponent;
 
 annotation(__OpenModelica_Interface="backend");
