@@ -6128,7 +6128,6 @@ protected
   BackendDAE.InnerEquations newInnerEquations = {};
   list<Integer> newResEquations = {};
   list<Integer> newIterationVars = {};
-  Boolean isLinear = true;
   Boolean isMixed = false;
   // DELETEME
   list<BackendDAE.Var> var_lst;
@@ -6143,7 +6142,7 @@ algorithm
         BackendDAE.InnerEquations innerEquations;
         BackendDAE.InnerEquation newInnerEquation;
         BackendDAE.JacobianType jacType;
-        Boolean linear, mixedSystem;
+        Boolean mixedSystem;
 
       case(BackendDAE.SINGLEEQUATION(eqn=eqnIndex, var=varIndex))
         equation
@@ -6151,17 +6150,13 @@ algorithm
           newInnerEquation = BackendDAE.INNEREQUATION(eqn=eqnIndex, vars={varIndex});
       then (newInnerEquation::newInnerEquations, newResEquations, newIterationVars);
 
-      case(BackendDAE.EQUATIONSYSTEM(eqns=eqnIndexes, vars=varIndexes, jacType=jacType, mixedSystem=mixedSystem))
+      case(BackendDAE.EQUATIONSYSTEM(eqns=eqnIndexes, vars=varIndexes, mixedSystem=mixedSystem))
         equation
           print("\nCase EQUATIONSYSTEM\n");
           var_lst = List.map1r(varIndexes, BackendVariable.getVarAt, BackendVariable.daeVars(inSystem));
           vars = BackendVariable.listVar1(var_lst);
           BackendDump.dumpVariables(vars, "equation system vars");
 
-          linear = BackendDAEUtil.getLinearfromJacType(jacType);
-          if not linear then
-            isLinear = false;
-          end if;
           if mixedSystem then
             isMixed = true;
           end if;
@@ -6197,15 +6192,12 @@ algorithm
           newInnerEquation = BackendDAE.INNEREQUATION(eqn=eqnIndex, vars=varIndexes);
       then (newInnerEquation::newInnerEquations, newResEquations, newIterationVars);
 
-      case(BackendDAE.TORNSYSTEM(strictTearingSet=BackendDAE.TEARINGSET(residualequations=resEqnIndexes, tearingvars=tVarIndexes, innerEquations=innerEquations), linear=linear, mixedSystem=mixedSystem))
+      case(BackendDAE.TORNSYSTEM(strictTearingSet=BackendDAE.TEARINGSET(residualequations=resEqnIndexes, tearingvars=tVarIndexes, innerEquations=innerEquations), mixedSystem=mixedSystem))
         algorithm
           print("\nCase TORNSYSTEM\n");
           var_lst := List.map1r(tVarIndexes, BackendVariable.getVarAt, BackendVariable.daeVars(inSystem));
           vars := BackendVariable.listVar1(var_lst);
           BackendDump.dumpVariables(vars, "torn system vars");
-          if not linear then
-            isLinear := false;
-          end if;
           if mixedSystem then
             isMixed := true;
           end if;
@@ -6220,7 +6212,7 @@ algorithm
   vars := BackendVariable.listVar1(var_lst);
   BackendDump.dumpVariables(vars, "newIterationVars");
 
-  outHomotopyComponent := BackendDAE.TORNSYSTEM(BackendDAE.TEARINGSET(listAppend(newIterationVars,{lambdaIdx}), newResEquations, listReverse(newInnerEquations), BackendDAE.EMPTY_JACOBIAN()), NONE(), isLinear, isMixed);
+  outHomotopyComponent := BackendDAE.TORNSYSTEM(BackendDAE.TEARINGSET(listAppend(newIterationVars,{lambdaIdx}), newResEquations, listReverse(newInnerEquations), BackendDAE.EMPTY_JACOBIAN()), NONE(), false, isMixed);
 end createOneHomotopyComponent;
 
 annotation(__OpenModelica_Interface="backend");
