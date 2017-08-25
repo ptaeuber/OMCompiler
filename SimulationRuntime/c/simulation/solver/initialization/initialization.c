@@ -185,7 +185,7 @@ static int symbolic_initialization(DATA *data, threadData_t *threadData)
   FILE *pFile = NULL;
   long i;
   MODEL_DATA *mData = data->modelData;
-
+  int solveWithGlobalHomotopy = data->callback->useHomotopy == 0 || (data->callback->useHomotopy != 2 && init_lambda_steps < 2) ? 0 : 1;
   data->simulationInfo->homotopyUsed = 0;
 
 #if !defined(OMC_NDELAY_EXPRESSIONS) || OMC_NDELAY_EXPRESSIONS>0
@@ -199,7 +199,7 @@ static int symbolic_initialization(DATA *data, threadData_t *threadData)
   /* If there is no homotopy in the model or local homotopy is activated
      or homotopy is disabled by runtime flag '-ils=<lambda_steps>',
      solve WITHOUT HOMOTOPY. */
-  if (data->callback->useHomotopy == 0 || init_lambda_steps < 2){
+  if (!solveWithGlobalHomotopy){
     data->simulationInfo->lambda = 1.0;
     data->callback->functionInitialEquations(data, threadData);
 
@@ -215,20 +215,20 @@ static int symbolic_initialization(DATA *data, threadData_t *threadData)
     data->simulationInfo->lambda = 1.0;
     infoStreamPrint(LOG_INIT, 0, "Try to solve the initialization problem without homotopy first.");
     data->callback->functionInitialEquations(data, threadData);
-    init_lambda_steps = 0;
+    solveWithGlobalHomotopy = 0;
 
     /* catch */
 #ifndef OMC_EMCC
   MMC_CATCH_INTERNAL(simulationJumpBuffer)
 #endif
-    if(init_lambda_steps > 0)
+    if(solveWithGlobalHomotopy)
       warningStreamPrint(LOG_ASSERT, 0, "Failed to solve the initialization problem without homotopy method. If homotopy is available the homotopy method is used now.");
   }
 
   /* If there is homotopy in the model and global homotopy is activated
      and solving without homotopy failed or is not wanted,
      use GLOBAL HOMOTOPY METHOD. */
-  if (data->callback->useHomotopy == 1 && init_lambda_steps > 1)
+  if (data->callback->useHomotopy == 1 && solveWithGlobalHomotopy)
   {
     long step;
     char buffer[4096];
@@ -282,10 +282,55 @@ static int symbolic_initialization(DATA *data, threadData_t *threadData)
     messageClose(LOG_INIT);
   }
 
+  /* If there is homotopy in the model and the new global homotopy approach is activated
+     and solving without homotopy failed or is not wanted,
+     use NEW GLOBAL HOMOTOPY APPROACH. */
+  if (data->callback->useHomotopy == 2 && solveWithGlobalHomotopy)
+  {
+    char buffer[4096];
+
+#if !defined(OMC_NO_FILESYSTEM)
+    if(ACTIVE_STREAM(LOG_INIT))
+    {
+      sprintf(buffer, "%s_global_homotopy.csv", mData->modelFilePrefix);
+      pFile = fopen(buffer, "wt");
+      fprintf(pFile, "\"sep=,\"\n%s", "lambda");
+      for(i=0; i<mData->nVariablesReal; ++i)
+        fprintf(pFile, ",%s", mData->realVarsData[i].info.name);
+      fprintf(pFile, "\n");
+    }
+#endif
+
+    infoStreamPrint(LOG_INIT, 1, "homotopy process\n---------------------------");
+
+    // Solve lambda0-DAE
+    data->simulationInfo->lambda = 0;
+    infoStreamPrint(LOG_INIT, 0, "solve simplified lambda0-DAE");
+    data->callback->functionInitialEquations_lambda0(data, threadData);
+    infoStreamPrint(LOG_INIT, 0, "solving simplified lambda0-DAE done\n---------------------------");
+
+#if !defined(OMC_NO_FILESYSTEM)
+    if(ACTIVE_STREAM(LOG_INIT))
+    {
+      fprintf(pFile, "%.16g", data->simulationInfo->lambda);
+      for(i=0; i<mData->nVariablesReal; ++i)
+        fprintf(pFile, ",%.16g", data->localData[0]->realVars[i]);
+      fprintf(pFile, "\n");
+    }
+#endif
+
+    // Run along the homotopy path and solve the actual system
+    infoStreamPrint(LOG_INIT, 0, "run along the homotopy path and solve the actual system");
+    data->callback->functionInitialEquations(data, threadData);
+
+    solvedWithHomotopy = 1;
+    messageClose(LOG_INIT);
+  }
+
   storeRelations(data);
 
 #if !defined(OMC_NO_FILESYSTEM)
-  if(data->callback->useHomotopy == 1 && init_lambda_steps > 1 && ACTIVE_STREAM(LOG_INIT))
+  if(data->callback->useHomotopy == 1 && solveWithGlobalHomotopy && ACTIVE_STREAM(LOG_INIT))
     fclose(pFile);
 #endif
 
