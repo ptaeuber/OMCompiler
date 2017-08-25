@@ -7918,6 +7918,24 @@ algorithm
   end match;
 end selectOptModules1;
 
+public function isInitOptModuleActivated " returns true if given initOptModule is activated
+  author: ptaeuber"
+  input String initOptModule;
+  output Boolean isActivated = false;
+protected
+  list<tuple<BackendDAEFunc.optimizationModule, String>> activatedInitOptModules;
+  String s;
+algorithm
+  activatedInitOptModules := getInitOptModules(NONE());
+  for activatedInitOptModule in activatedInitOptModules loop
+    (_, s) := activatedInitOptModule;
+    if stringEqual(s, initOptModule) then
+      isActivated := true;
+      return;
+    end if;
+  end for;
+end isInitOptModuleActivated;
+
 /*************************************************
  * profiler stuff
  ************************************************/
