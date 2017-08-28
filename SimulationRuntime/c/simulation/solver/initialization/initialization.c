@@ -205,8 +205,9 @@ static int symbolic_initialization(DATA *data, threadData_t *threadData)
 
   /* If there is homotopy in the model and global homotopy is activated
      and homotopy on first try is deactivated,
-     TRY TO SOLVE WITHOUT HOMOTOPY FIRST. */
-  } else if (!omc_flag[FLAG_HOMOTOPY_ON_FIRST_TRY]) {
+     TRY TO SOLVE WITHOUT HOMOTOPY FIRST.
+     To-Do: Activate trying without homotopy first also for the new global homotopy approach */
+  } else if (!omc_flag[FLAG_HOMOTOPY_ON_FIRST_TRY] && data->callback->useHomotopy != 2) {
     /* try */
 #ifndef OMC_EMCC
   MMC_TRY_INTERNAL(simulationJumpBuffer)
