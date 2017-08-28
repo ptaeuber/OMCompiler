@@ -415,7 +415,7 @@ int initializeNonlinearSystems(DATA *data, threadData_t *threadData)
 
     /* allocate solver data */
     if(data->callback->useHomotopy == 2 && nonlinsys[i].homotopySupport)
-      allocateHomotopyData(size, &nonlinsys[i].solverData);
+      allocateHomotopyData(size-1, &nonlinsys[i].solverData);
     else{
       switch(data->simulationInfo->nlsMethod)
       {
