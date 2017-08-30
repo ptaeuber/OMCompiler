@@ -6213,6 +6213,7 @@ algorithm
   BackendDump.dumpVariables(vars, "newIterationVars");
 
   outHomotopyComponent := BackendDAE.TORNSYSTEM(BackendDAE.TEARINGSET(listAppend(newIterationVars,{lambdaIdx}), newResEquations, listReverse(newInnerEquations), BackendDAE.EMPTY_JACOBIAN()), NONE(), false, isMixed);
+  // outHomotopyComponent := BackendDAE.TORNSYSTEM(BackendDAE.TEARINGSET(newIterationVars, newResEquations, listReverse(newInnerEquations), BackendDAE.EMPTY_JACOBIAN()), NONE(), false, isMixed);
 end createOneHomotopyComponent;
 
 annotation(__OpenModelica_Interface="backend");

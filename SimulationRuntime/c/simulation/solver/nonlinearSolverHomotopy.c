@@ -1024,8 +1024,10 @@ static int wrapper_fvec_homotopy_initialization_der(DATA_HOMOTOPY* solverData, d
   /* Newton homotopy */
   wrapper_fvec_der(solverData, x, hJac);
 
+
   /* add f(x0) as the last column of the Jacobian*/
   // vecCopy(n, solverData->fx0, hJac + n*n);
+  // debugMatrixDouble(LOG_NLS_JAC,"Jacobian hJac:",hJac, n, n+1);
 
   return 0;
 }
@@ -1634,6 +1636,25 @@ static int homotopyAlgorithm(DATA_HOMOTOPY* solverData, double *x)
 
   int assert = 1;
   threadData_t *threadData = solverData->threadData;
+  FILE *pFile = NULL;
+  char buffer[4096];
+
+#if !defined(OMC_NO_FILESYSTEM)
+    if(solverData->initHomotopy && ACTIVE_STREAM(LOG_INIT))
+    {
+      sprintf(buffer, "%s_new_global_homotopy_%s.csv", solverData->data->modelData->modelFilePrefix, solverData->startDirection > 0 ? "pos" : "neg");
+      pFile = fopen(buffer, "wt");
+      fprintf(pFile, "\"sep=,\"\n");
+      fprintf(pFile, "%s", modelInfoGetEquation(&solverData->data->modelData->modelDataXml,solverData->eqSystemNumber).vars[n]);
+      for(i=0; i<n; ++i)
+        fprintf(pFile, ",%s", modelInfoGetEquation(&solverData->data->modelData->modelDataXml,solverData->eqSystemNumber).vars[i]);
+      fprintf(pFile, "\n");
+      fprintf(pFile, "0.0");
+      for(i=0; i<n; ++i)
+        fprintf(pFile, ",%.16g", x[i]);
+      fprintf(pFile, "\n");
+    }
+#endif
 
   /* Initialize vector dy2 using chosen startDirection */
   /* set start vector, lambda = 0.0 */
@@ -1668,12 +1689,12 @@ static int homotopyAlgorithm(DATA_HOMOTOPY* solverData, double *x)
       debugString(LOG_NLS_HOMOTOPY, "======================================================");
       return -1;
     }
-    if (numSteps >= solverData->maxNumberOfIterations)
-    {
-      debugInt(LOG_NLS_HOMOTOPY, "Homotopy Algorithm did not converge: numSteps = ", numSteps);
-      debugString(LOG_NLS_HOMOTOPY, "======================================================");
-      return -1;
-    }
+    // if (numSteps >= solverData->maxNumberOfIterations)
+    // {
+      // debugInt(LOG_NLS_HOMOTOPY, "Homotopy Algorithm did not converge: numSteps = ", numSteps);
+      // debugString(LOG_NLS_HOMOTOPY, "======================================================");
+      // return -1;
+    // }
 
     stepAccept = 0;
 
@@ -1686,7 +1707,9 @@ static int homotopyAlgorithm(DATA_HOMOTOPY* solverData, double *x)
     MMC_TRY_INTERNAL(simulationJumpBuffer)
 #endif
       solverData->hJac_dh(solverData, solverData->y0, solverData->hJac);
+      debugMatrixDouble(LOG_NLS_JAC,"Jacobian hJac:",solverData->hJac, solverData->n, solverData->n+1);
       scaleMatrixRows(solverData->n, solverData->m, solverData->hJac);
+      debugMatrixDouble(LOG_NLS_JAC,"Jacobian hJac after scaling:",solverData->hJac, solverData->n, solverData->n+1);
       assert = 0;
       pos = -1; /* stable solution algorithm for solving a generalized over-determined linear system */
 #ifndef OMC_EMCC
@@ -1871,6 +1894,15 @@ static int homotopyAlgorithm(DATA_HOMOTOPY* solverData, double *x)
       debugString(LOG_NLS_HOMOTOPY, "======================================================");
       printHomotopyUnknowns(LOG_NLS_HOMOTOPY, solverData);
     }
+#if !defined(OMC_NO_FILESYSTEM)
+    if(solverData->initHomotopy && ACTIVE_STREAM(LOG_INIT))
+    {
+      fprintf(pFile, "%.16g", solverData->y1[n]);
+      for(i=0; i<n; ++i)
+        fprintf(pFile, ",%.16g", solverData->y1[i]);
+      fprintf(pFile, "\n");
+    }
+#endif
   }
   /* copy solution back to vector x */
   vecCopy(solverData->n, solverData->y1, x);
@@ -1878,6 +1910,11 @@ static int homotopyAlgorithm(DATA_HOMOTOPY* solverData, double *x)
   debugString(LOG_NLS_HOMOTOPY, "HOMOTOPY ALGORITHM SUCCEEDED");
   debugString(LOG_NLS_HOMOTOPY, "======================================================");
   solverData->info = 1;
+
+#if !defined(OMC_NO_FILESYSTEM)
+  if(solverData->initHomotopy && ACTIVE_STREAM(LOG_INIT))
+    fclose(pFile);
+#endif
 
   return 0;
 }
