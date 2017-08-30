@@ -363,9 +363,15 @@ void printHomotopyPredictorStep(int logName, DATA_HOMOTOPY *solverData)
     infoStreamPrint(logName, 0, "[%2ld] %30s  = %16.8g\t\t dy = %16.8g\t\t old = %16.8g\t\t tau = %16.8g", i+1,
                     modelInfoGetEquation(&data->modelData->modelDataXml,eqSystemNumber).vars[i],
                     solverData->yt[i], solverData->dy0[i], solverData->y0[i], solverData->tau);
-  infoStreamPrint(logName, 0, "[%2ld] %30s  = %16.8g\t\t dy = %16.8g\t\t old = %16.8g\t\t tau = %16.8g", i+1,
-                  "LAMBDA",
-                  solverData->yt[solverData->n], solverData->dy0[i], solverData->y0[i], solverData->tau);
+  if (solverData->initHomotopy) {
+    infoStreamPrint(logName, 0, "[%2ld] %30s  = %16.8g\t\t dy = %16.8g\t\t old = %16.8g\t\t tau = %16.8g", i+1,
+                    modelInfoGetEquation(&data->modelData->modelDataXml,eqSystemNumber).vars[i],
+                    solverData->yt[i], solverData->dy0[i], solverData->y0[i], solverData->tau);
+  } else {
+    infoStreamPrint(logName, 0, "[%2ld] %30s  = %16.8g\t\t dy = %16.8g\t\t old = %16.8g\t\t tau = %16.8g", i+1,
+                    "LAMBDA",
+                    solverData->yt[solverData->n], solverData->dy0[i], solverData->y0[i], solverData->tau);
+  }
   messageClose(logName);
 }
 
@@ -384,9 +390,15 @@ void printHomotopyCorrectorStep(int logName, DATA_HOMOTOPY *solverData)
     infoStreamPrint(logName, 0, "[%2ld] %30s  = %16.8g\t\t dy = %16.8g\t\t old = %16.8g\t\t tau = %16.8g", i+1,
                     modelInfoGetEquation(&data->modelData->modelDataXml,eqSystemNumber).vars[i],
                     solverData->y1[i], solverData->dy1[i], solverData->yt[i], solverData->tau);
-  infoStreamPrint(logName, 0, "[%2ld] %30s  = %16.8g\t\t dy = %16.8g\t\t old = %16.8g\t\t tau = %16.8g", i+1,
-                  "LAMBDA",
-                  solverData->y1[solverData->n], solverData->dy1[i], solverData->yt[i], solverData->tau);
+  if (solverData->initHomotopy) {
+    infoStreamPrint(logName, 0, "[%2ld] %30s  = %16.8g\t\t dy = %16.8g\t\t old = %16.8g\t\t tau = %16.8g", i+1,
+                    modelInfoGetEquation(&data->modelData->modelDataXml,eqSystemNumber).vars[i],
+                    solverData->y1[i], solverData->dy1[i], solverData->yt[i], solverData->tau);
+  } else {
+    infoStreamPrint(logName, 0, "[%2ld] %30s  = %16.8g\t\t dy = %16.8g\t\t old = %16.8g\t\t tau = %16.8g", i+1,
+                    "LAMBDA",
+                    solverData->y1[solverData->n], solverData->dy1[i], solverData->yt[i], solverData->tau);
+  }
   messageClose(logName);
 }
 
