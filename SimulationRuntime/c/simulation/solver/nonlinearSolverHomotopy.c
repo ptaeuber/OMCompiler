@@ -1676,6 +1676,7 @@ static int homotopyAlgorithm(DATA_HOMOTOPY* solverData, double *x)
   /* start iteration; stop, if lambda = solverData->y0[solverData->n] == 1 */
   while (solverData->y0[solverData->n]<1)
   {
+    infoStreamPrint(LOG_INIT, 0, "homotopy parameter lambda = %g", solverData->y0[solverData->n]);
     /* Break loop, iff algorithm gets stuck or lambda accelerates to the wrong direction */
     if (iter>10)
     {
@@ -1897,9 +1898,9 @@ static int homotopyAlgorithm(DATA_HOMOTOPY* solverData, double *x)
 #if !defined(OMC_NO_FILESYSTEM)
     if(solverData->initHomotopy && ACTIVE_STREAM(LOG_INIT))
     {
-      fprintf(pFile, "%.16g", solverData->y1[n]);
+      fprintf(pFile, "%.16g", solverData->y0[n]);
       for(i=0; i<n; ++i)
-        fprintf(pFile, ",%.16g", solverData->y1[i]);
+        fprintf(pFile, ",%.16g", solverData->y0[i]);
       fprintf(pFile, "\n");
     }
 #endif
@@ -2225,14 +2226,14 @@ int solveHomotopy(DATA *data, threadData_t *threadData, int sysNumber)
         solverData->h_function = wrapper_fvec_homotopy_initialization;
         solverData->hJac_dh = wrapper_fvec_homotopy_initialization_der;
         solverData->startDirection = 1.0;
-        debugDouble(LOG_NLS_HOMOTOPY,"STARTING HOMOTOPY METHOD; startDirection = ", solverData->startDirection);
+        debugDouble(LOG_INIT,"STARTING HOMOTOPY METHOD; startDirection = ", solverData->startDirection);
       }
 
       if (runHomotopy == 2) {
         solverData->h_function = wrapper_fvec_homotopy_initialization;
         solverData->hJac_dh = wrapper_fvec_homotopy_initialization_der;
         solverData->startDirection = -1.0;
-        debugDouble(LOG_NLS_HOMOTOPY,"STARTING HOMOTOPY METHOD; startDirection = ", solverData->startDirection);
+        debugDouble(LOG_INIT,"STARTING HOMOTOPY METHOD; startDirection = ", solverData->startDirection);
       }
     }
     else {
