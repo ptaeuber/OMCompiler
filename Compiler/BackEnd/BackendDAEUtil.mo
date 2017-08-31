@@ -7921,14 +7921,17 @@ end selectOptModules1;
 public function isInitOptModuleActivated " returns true if given initOptModule is activated
   author: ptaeuber"
   input String initOptModule;
+  input list<tuple<BackendDAEFunc.optimizationModule, String>> activatedInitOptModules = {};
   output Boolean isActivated = false;
 protected
-  list<tuple<BackendDAEFunc.optimizationModule, String>> activatedInitOptModules;
+  list<tuple<BackendDAEFunc.optimizationModule, String>> modules = activatedInitOptModules;
   String s;
 algorithm
-  activatedInitOptModules := getInitOptModules(NONE());
-  for activatedInitOptModule in activatedInitOptModules loop
-    (_, s) := activatedInitOptModule;
+  if listEmpty(modules) then
+    modules := getInitOptModules(NONE());
+  end if;
+  for module in modules loop
+    (_, s) := module;
     if stringEqual(s, initOptModule) then
       isActivated := true;
       return;

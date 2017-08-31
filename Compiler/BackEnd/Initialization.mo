@@ -229,6 +229,9 @@ algorithm
     end if;
 
     initOptModules := BackendDAEUtil.getInitOptModules(NONE(), {}, disabledModules);
+    if BackendDAEUtil.isInitOptModuleActivated("generateHomotopyComponents", initOptModules) and not BackendDAEUtil.isInitOptModuleActivated("inlineHomotopy", initOptModules) then
+      initOptModules := (BackendDAEOptimize.inlineHomotopy, "inlineHomotopy")::initOptModules;
+    end if;
     matchingAlgorithm := BackendDAEUtil.getMatchingAlgorithm(NONE());
     daeHandler := BackendDAEUtil.getIndexReductionMethod(SOME("none"));
     initdae := BackendDAEUtil.postOptimizeDAE(initdae, initOptModules, matchingAlgorithm, daeHandler);
