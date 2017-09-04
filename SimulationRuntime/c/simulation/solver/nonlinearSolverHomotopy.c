@@ -1690,12 +1690,12 @@ static int homotopyAlgorithm(DATA_HOMOTOPY* solverData, double *x)
       debugString(LOG_NLS_HOMOTOPY, "======================================================");
       return -1;
     }
-    // if (numSteps >= solverData->maxNumberOfIterations)
-    // {
-      // debugInt(LOG_NLS_HOMOTOPY, "Homotopy Algorithm did not converge: numSteps = ", numSteps);
-      // debugString(LOG_NLS_HOMOTOPY, "======================================================");
-      // return -1;
-    // }
+    if (numSteps >= solverData->maxNumberOfIterations)
+    {
+      debugInt(LOG_NLS_HOMOTOPY, "Homotopy Algorithm did not converge: numSteps = ", numSteps);
+      debugString(LOG_NLS_HOMOTOPY, "======================================================");
+      return -1;
+    }
 
     stepAccept = 0;
 
