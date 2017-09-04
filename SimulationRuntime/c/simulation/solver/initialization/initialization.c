@@ -324,7 +324,7 @@ static int symbolic_initialization(DATA *data, threadData_t *threadData)
     infoStreamPrint(LOG_INIT, 0, "run along the homotopy path and solve the actual system");
     data->callback->functionInitialEquations(data, threadData);
 
-    solvedWithHomotopy = 1;
+    data->simulationInfo->homotopyUsed = 1;
     messageClose(LOG_INIT);
   }
 
