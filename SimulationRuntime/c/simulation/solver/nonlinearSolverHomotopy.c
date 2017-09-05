@@ -1630,6 +1630,7 @@ static int homotopyAlgorithm(DATA_HOMOTOPY* solverData, double *x)
   double bend = 0;
   double sProd, detJac;
   double tau = 0.2, tauMax = 10.0, tauMin = 1e-4, hEps = 1e-3, adaptBend = 0.05;
+  double tauDecreasingFactor = 10.0, tauDecreasingFactorPredictor = 2.0, tauIncreasingFactor = 2.0, tauIncreasingThreshold = 10.0;
   int m = solverData->m;
   int n = solverData->n;
   int initialStep = 1;
@@ -1768,16 +1769,20 @@ static int homotopyAlgorithm(DATA_HOMOTOPY* solverData, double *x)
 #ifndef OMC_EMCC
     MMC_CATCH_INTERNAL(simulationJumpBuffer)
 #endif
-     if (assert)
-       tau = tau/2;
-       debugDouble(LOG_NLS_HOMOTOPY, "--- decreasing step size tau= tau/2 =", tau);
+      if (assert){
+        debugString(LOG_NLS_HOMOTOPY, "Assert, when calculating function value!");
+        debugString(LOG_NLS_HOMOTOPY, "--- decreasing step size tau in predictor step!");
+        debugDouble(LOG_NLS_HOMOTOPY, "old tau =", tau);
+        tau = tau/tauDecreasingFactorPredictor;
+        debugDouble(LOG_NLS_HOMOTOPY, "new tau =", tau);
+      }
     }
     if (assert)
     {
         /* report solver abortion */
         solverData->info=-1;
         /* debug information */
-        debugString(LOG_NLS_HOMOTOPY, "Assert, when calculating function value!");
+        debugString(LOG_NLS_HOMOTOPY, "Assert, because tau cannot be decreased anymore and current tau already failed!");
         debugString(LOG_NLS_HOMOTOPY, "Homotopy Algorithm did not converge");
         debugString(LOG_NLS_HOMOTOPY, "======================================================");
         /* update statistics */
@@ -1794,6 +1799,7 @@ static int homotopyAlgorithm(DATA_HOMOTOPY* solverData, double *x)
     {
       if (vec2Norm(solverData->n, solverData->hvec)<hEps || vec2Norm(solverData->n, solverData->hvecScaled)<hEps)
       {
+        debugString(LOG_NLS_HOMOTOPY, "step accepted!");
         stepAccept = 1;
         break;
       }
@@ -1809,8 +1815,9 @@ static int homotopyAlgorithm(DATA_HOMOTOPY* solverData, double *x)
 #endif
       if (assert)
       {
-          stepAccept = 0;
-          break;
+        debugString(LOG_NLS_HOMOTOPY, "step NOT accepted, because hJac_dh could not be calculated!");
+        stepAccept = 0;
+        break;
       }
       matVecMultAbs(solverData->n, solverData->m, solverData->hJac, solverData->ones, solverData->resScaling);
       debugVectorDouble(LOG_NLS_HOMOTOPY, "residuum scaling of function h:", solverData->resScaling, solverData->n);
@@ -1820,6 +1827,7 @@ static int homotopyAlgorithm(DATA_HOMOTOPY* solverData, double *x)
       scaleMatrixRows(solverData->n, solverData->m, solverData->hJac);
       if (solveSystemWithTotalPivotSearch(solverData->n, solverData->dy1, solverData->hJac, solverData->indRow, solverData->indCol, &pos, &rank, solverData->casualTearingSet) == -1)
       {
+        debugString(LOG_NLS_HOMOTOPY, "step NOT accepted, because solveSystemWithTotalPivotSearch failed!");
         stepAccept = 0;
         break;
       }
@@ -1840,8 +1848,9 @@ static int homotopyAlgorithm(DATA_HOMOTOPY* solverData, double *x)
 #endif
       if (assert)
       {
-          stepAccept = 0;
-          break;
+        debugString(LOG_NLS_HOMOTOPY, "step NOT accepted, because h_function could not be calculated!");
+        stepAccept = 0;
+        break;
       }
       /* Calculate different error measurements */
       vecDivScaling(solverData->n, solverData->hvec, solverData->resScaling, solverData->hvecScaled);
@@ -1851,7 +1860,7 @@ static int homotopyAlgorithm(DATA_HOMOTOPY* solverData, double *x)
       error_h_scaled = vec2Norm(solverData->n, solverData->hvecScaled);
 
 
-      /* debug information
+      /* debug information */
       debugVectorDouble(LOG_NLS_HOMOTOPY,"function values:",solverData->hvec, n);
       debugVectorDouble(LOG_NLS_HOMOTOPY,"scaled function values:",solverData->hvecScaled, n);
 
@@ -1860,14 +1869,20 @@ static int homotopyAlgorithm(DATA_HOMOTOPY* solverData, double *x)
       debugDouble(LOG_NLS_HOMOTOPY, "error_h        =", error_h);
       debugDouble(LOG_NLS_HOMOTOPY, "error_h_scaled =", error_h_scaled);
       debugDouble(LOG_NLS_HOMOTOPY, "hEps           =", hEps);
-      */
+
     }
+
     if (!assert)
     {
       vecDiff(solverData->m, solverData->y1, solverData->yt, solverData->dy1);
       vecDiff(solverData->m, solverData->yt, solverData->y0, solverData->dy2);
       printHomotopyCorrectorStep(LOG_NLS_HOMOTOPY, solverData);
       bend = vec2Norm(solverData->m,solverData->dy1)/vec2Norm(solverData->m,solverData->dy2);
+
+      debugDouble(LOG_NLS_HOMOTOPY, "vector length of predictor step =", vec2Norm(solverData->m,solverData->dy2));
+      debugDouble(LOG_NLS_HOMOTOPY, "vector length of corrector step =", vec2Norm(solverData->m,solverData->dy1));
+      debugDouble(LOG_NLS_HOMOTOPY, "bend  =", bend);
+      debugDouble(LOG_NLS_HOMOTOPY, "adaptBend  =", adaptBend);
     }
     if ((bend > adaptBend) ||   !stepAccept)
     {
@@ -1879,34 +1894,39 @@ static int homotopyAlgorithm(DATA_HOMOTOPY* solverData, double *x)
         /* update statistics */
         return -1;
       }
-      tau = fmax(tauMin,tau/10.0);
+      debugString(LOG_NLS_HOMOTOPY, "The relation between the vector length of corrector step and predictor step is too big:");
       debugDouble(LOG_NLS_HOMOTOPY, "bend/adaptBend  =", bend/adaptBend);
-      debugDouble(LOG_NLS_HOMOTOPY, "--- decreasing step size tau =", tau);
+      debugString(LOG_NLS_HOMOTOPY, "--- decreasing step size tau in corrector step!");
+      debugDouble(LOG_NLS_HOMOTOPY, "old tau =", tau);
+      tau = fmax(tauMin,tau/tauDecreasingFactor);
+      debugDouble(LOG_NLS_HOMOTOPY, "new tau =", tau);
       iter++;
     } else
     {
       initialStep = 0;
       iter = 0;
       numSteps++;
-      if (bend < adaptBend/10.0)
+      if (bend < adaptBend/tauIncreasingThreshold)
       {
-        tau = fmin(tauMax, tau*2);
-        debugDouble(LOG_NLS_HOMOTOPY, "+++ increasing step size, tau =", tau);
+        debugString(LOG_NLS_HOMOTOPY, "--- increasing step size tau in corrector step!");
+        debugDouble(LOG_NLS_HOMOTOPY, "old tau =", tau);
+        tau = fmin(tauMax, tau*tauIncreasingFactor);
+        debugDouble(LOG_NLS_HOMOTOPY, "new tau =", tau);
       }
       vecCopy(solverData->m, solverData->y1, solverData->y0);
       vecCopy(solverData->m, solverData->dy0, solverData->dy2);
-      debugString(LOG_NLS_HOMOTOPY, "======================================================");
+      debugString(LOG_NLS_HOMOTOPY, "Successfull homotopy step!\n======================================================");
       printHomotopyUnknowns(LOG_NLS_HOMOTOPY, solverData);
-    }
 #if !defined(OMC_NO_FILESYSTEM)
-    if(solverData->initHomotopy && ACTIVE_STREAM(LOG_INIT))
-    {
-      fprintf(pFile, "%.16g", solverData->y0[n]);
-      for(i=0; i<n; ++i)
-        fprintf(pFile, ",%.16g", solverData->y0[i]);
-      fprintf(pFile, "\n");
-    }
+      if(solverData->initHomotopy && ACTIVE_STREAM(LOG_INIT))
+      {
+        fprintf(pFile, "%.16g", solverData->y0[n]);
+        for(i=0; i<n; ++i)
+          fprintf(pFile, ",%.16g", solverData->y0[i]);
+        fprintf(pFile, "\n");
+      }
 #endif
+    }
   }
   /* copy solution back to vector x */
   vecCopy(solverData->n, solverData->y1, x);
