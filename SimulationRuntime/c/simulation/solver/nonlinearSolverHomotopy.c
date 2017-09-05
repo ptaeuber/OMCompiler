@@ -1754,20 +1754,19 @@ static int homotopyAlgorithm(DATA_HOMOTOPY* solverData, double *x)
     }
 
     assert = 1;
-    while (assert && (tau > tauMin))
-    {
+    do {
       /* do update and store approximated vector in yt */
       vecAddScal(solverData->m, solverData->y0, solverData->dy0, tau,  solverData->y1);
 
       /* update function value */
 #ifndef OMC_EMCC
-    MMC_TRY_INTERNAL(simulationJumpBuffer)
+      MMC_TRY_INTERNAL(simulationJumpBuffer)
 #endif
       debugVectorDouble(LOG_NLS_HOMOTOPY,"y1 (predictor step):",solverData->y1, m);
       solverData->h_function(solverData, solverData->y1, solverData->hvec);
       assert = 0;
 #ifndef OMC_EMCC
-    MMC_CATCH_INTERNAL(simulationJumpBuffer)
+      MMC_CATCH_INTERNAL(simulationJumpBuffer)
 #endif
       if (assert){
         debugString(LOG_NLS_HOMOTOPY, "Assert, when calculating function value!");
@@ -1776,7 +1775,8 @@ static int homotopyAlgorithm(DATA_HOMOTOPY* solverData, double *x)
         tau = tau/tauDecreasingFactorPredictor;
         debugDouble(LOG_NLS_HOMOTOPY, "new tau =", tau);
       }
-    }
+    } while (assert && (tau > tauMin));
+
     if (assert)
     {
         /* report solver abortion */
