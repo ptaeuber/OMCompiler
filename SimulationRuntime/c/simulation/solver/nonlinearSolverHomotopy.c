@@ -1623,17 +1623,20 @@ static int homotopyAlgorithm(DATA_HOMOTOPY* solverData, double *x)
   int iflag = 1;
   int pos, rank;
   int iter = 0;
-  int maxiter = 20;
+  int maxiter = homMaxNewtonSteps;
+  int maxTries = homMaxTries;
   int numSteps = 0;
   int stepAccept = 0;
   int runHomotopy = 0;
   double bend = 0;
   double sProd, detJac;
-  double tau = 0.2, tauMax = 10.0, tauMin = 1e-4, hEps = 1e-3, adaptBend = 0.05;
-  double tauDecreasingFactor = 10.0, tauDecreasingFactorPredictor = 2.0, tauIncreasingFactor = 2.0, tauIncreasingThreshold = 10.0;
+  double tau = homTauStart, tauMax = homTauMax, tauMin = homTauMin, hEps = homHEps, adaptBend = homAdaptBend;
+  double tauDecreasingFactor = homTauDecreasingFactor, tauDecreasingFactorPredictor = homTauDecreasingFactorPredictor;
+  double tauIncreasingFactor = homTauIncreasingFactor, tauIncreasingThreshold = homTauIncreasingThreshold;
   int m = solverData->m;
   int n = solverData->n;
   int initialStep = 1;
+  int maxLambdaSteps = homMaxLambdaSteps ? homMaxLambdaSteps : solverData->maxNumberOfIterations;
 
   int assert = 1;
   threadData_t *threadData = solverData->threadData;
@@ -1680,7 +1683,7 @@ static int homotopyAlgorithm(DATA_HOMOTOPY* solverData, double *x)
     if (solverData->initHomotopy)
       infoStreamPrint(LOG_INIT, 0, "homotopy parameter lambda = %g", solverData->y0[solverData->n]);
     /* Break loop, iff algorithm gets stuck or lambda accelerates to the wrong direction */
-    if (iter>10)
+    if (iter>maxTries)
     {
       debugInt(LOG_NLS_HOMOTOPY, "Homotopy Algorithm did not converge: iter = ", iter);
       debugString(LOG_NLS_HOMOTOPY, "======================================================");
@@ -1692,7 +1695,7 @@ static int homotopyAlgorithm(DATA_HOMOTOPY* solverData, double *x)
       debugString(LOG_NLS_HOMOTOPY, "======================================================");
       return -1;
     }
-    if (numSteps >= solverData->maxNumberOfIterations)
+    if (numSteps >= maxLambdaSteps)
     {
       debugInt(LOG_NLS_HOMOTOPY, "Homotopy Algorithm did not converge: numSteps = ", numSteps);
       debugString(LOG_NLS_HOMOTOPY, "======================================================");
