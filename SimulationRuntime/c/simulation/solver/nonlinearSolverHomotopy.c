@@ -1676,7 +1676,8 @@ static int homotopyAlgorithm(DATA_HOMOTOPY* solverData, double *x)
   /* start iteration; stop, if lambda = solverData->y0[solverData->n] == 1 */
   while (solverData->y0[solverData->n]<1)
   {
-    infoStreamPrint(LOG_INIT, 0, "homotopy parameter lambda = %g", solverData->y0[solverData->n]);
+    if (solverData->initHomotopy)
+      infoStreamPrint(LOG_INIT, 0, "homotopy parameter lambda = %g", solverData->y0[solverData->n]);
     /* Break loop, iff algorithm gets stuck or lambda accelerates to the wrong direction */
     if (iter>10)
     {
@@ -1761,6 +1762,7 @@ static int homotopyAlgorithm(DATA_HOMOTOPY* solverData, double *x)
 #ifndef OMC_EMCC
     MMC_TRY_INTERNAL(simulationJumpBuffer)
 #endif
+      debugVectorDouble(LOG_NLS_HOMOTOPY,"y1 (predictor step):",solverData->y1, m);
       solverData->h_function(solverData, solverData->y1, solverData->hvec);
       assert = 0;
 #ifndef OMC_EMCC
@@ -1768,6 +1770,7 @@ static int homotopyAlgorithm(DATA_HOMOTOPY* solverData, double *x)
 #endif
      if (assert)
        tau = tau/2;
+       debugDouble(LOG_NLS_HOMOTOPY, "--- decreasing step size tau= tau/2 =", tau);
     }
     if (assert)
     {
