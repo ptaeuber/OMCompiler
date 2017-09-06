@@ -1646,7 +1646,7 @@ static int homotopyAlgorithm(DATA_HOMOTOPY* solverData, double *x)
 #if !defined(OMC_NO_FILESYSTEM)
     if(solverData->initHomotopy && ACTIVE_STREAM(LOG_INIT))
     {
-      sprintf(buffer, "%s_new_global_homotopy_%s.csv", solverData->data->modelData->modelFilePrefix, solverData->startDirection > 0 ? "pos" : "neg");
+      sprintf(buffer, "%s_syst%d_new_global_homotopy_%s.csv", solverData->data->modelData->modelFilePrefix, solverData->sysNumber, solverData->startDirection > 0 ? "pos" : "neg");
       pFile = fopen(buffer, "wt");
       fprintf(pFile, "\"sep=,\"\n");
       fprintf(pFile, "%s", modelInfoGetEquation(&solverData->data->modelData->modelDataXml,solverData->eqSystemNumber).vars[n]);
