@@ -1683,21 +1683,30 @@ static int homotopyAlgorithm(DATA_HOMOTOPY* solverData, double *x)
     if (solverData->initHomotopy)
       infoStreamPrint(LOG_INIT, 0, "homotopy parameter lambda = %g", solverData->y0[solverData->n]);
     /* Break loop, iff algorithm gets stuck or lambda accelerates to the wrong direction */
-    if (iter>maxTries)
+    if (iter>=maxTries)
     {
-      debugInt(LOG_NLS_HOMOTOPY, "Homotopy Algorithm did not converge: iter = ", iter);
+      if (solverData->initHomotopy)
+        warningStreamPrint(LOG_ASSERT, 0, "Homotopy algorithm did not converge.\nThe maximum number of tries for one lamda is reached (%d).\nYou can change the number of tries with:\n\t-homMaxTries=<value>\nYou can also try to allow more newton steps in the corrector step with:\n\t-homMaxNewtonSteps=<value>\nor change the tolerance for the solution with:\n\t-homHEps=<value>\nYou can use -lv=LOG_INIT,LOG_NLS_HOMOTOPY to get more information.", iter);
+      else
+        debugInt(LOG_NLS_HOMOTOPY, "Homotopy algorithm did not converge: iter = ", iter);
       debugString(LOG_NLS_HOMOTOPY, "======================================================");
       return -1;
     }
     if (solverData->y0[solverData->n]<(-1))
     {
-      debugDouble(LOG_NLS_HOMOTOPY, "Homotopy Algorithm did not converge: lambda = ", solverData->y0[solverData->n]);
+      if (solverData->initHomotopy)
+        warningStreamPrint(LOG_ASSERT, 0, "Homotopy algorithm did not converge.\nlambda is smaller than -1: lambda=%g\nYou can use -lv=LOG_INIT,LOG_NLS_HOMOTOPY to get more information.", solverData->y0[solverData->n]);
+      else
+        debugDouble(LOG_NLS_HOMOTOPY, "Homotopy algorithm did not converge: lambda = ", solverData->y0[solverData->n]);
       debugString(LOG_NLS_HOMOTOPY, "======================================================");
       return -1;
     }
     if (numSteps >= maxLambdaSteps)
     {
-      debugInt(LOG_NLS_HOMOTOPY, "Homotopy Algorithm did not converge: numSteps = ", numSteps);
+      if (solverData->initHomotopy)
+        warningStreamPrint(LOG_ASSERT, 0, "Homotopy algorithm did not converge.\nThe maximum number of lambda steps is reached (%d).\nYou can change the maximum number of lambda steps with:\n\t-homMaxLambdaSteps=<value>\nYou can also try to influence the step size tau with the following flags:\n\t-homTauDecFac=<value>\n\t-homTauDecFacPredictor=<value>\n\t-homTauIncFac=<value>\n\t-homTauIncThreshold=<value>\n\t-homTauMax=<value>\n\t-homTauMin=<value>\n\t-homTauStart=<value>\nor you can also set the threshold for accepting the current bending with:\n\t-homAdaptBend=<value>\nYou can use -lv=LOG_INIT,LOG_NLS_HOMOTOPY to get more information.", maxLambdaSteps);
+      else
+        debugInt(LOG_NLS_HOMOTOPY, "Homotopy algorithm did not converge: numSteps = ", numSteps);
       debugString(LOG_NLS_HOMOTOPY, "======================================================");
       return -1;
     }
@@ -1727,11 +1736,21 @@ static int homotopyAlgorithm(DATA_HOMOTOPY* solverData, double *x)
         /* report solver abortion */
         solverData->info=-1;
         /* debug information */
-        if (assert)
-          debugString(LOG_NLS_HOMOTOPY, "Assert, when calculating Jacobian!");
-        else
-          debugString(LOG_NLS_HOMOTOPY, "System singular and not solvable!");
-        debugString(LOG_NLS_HOMOTOPY, "Homotopy Algorithm did not converge");
+        if (assert) {
+          if (solverData->initHomotopy)
+            warningStreamPrint(LOG_ASSERT, 0, "Homotopy algorithm did not converge.\nIt was not possible to calculate the jacobian.\nYou can use -lv=LOG_INIT,LOG_NLS_HOMOTOPY to get more information.");
+          else {
+            debugString(LOG_NLS_HOMOTOPY, "Assert, when calculating Jacobian!");
+            debugString(LOG_NLS_HOMOTOPY, "Homotopy algorithm did not converge");
+          }
+        } else {
+          if (solverData->initHomotopy)
+            warningStreamPrint(LOG_ASSERT, 0, "Homotopy algorithm did not converge.\nThe system is singular and not solvable.\nYou can use -lv=LOG_INIT,LOG_NLS_HOMOTOPY to get more information.");
+          else {
+            debugString(LOG_NLS_HOMOTOPY, "System singular and not solvable!");
+            debugString(LOG_NLS_HOMOTOPY, "Homotopy algorithm did not converge");
+          }
+        }
         debugString(LOG_NLS_HOMOTOPY, "======================================================");
         /* update statistics */
         return -1;
@@ -1785,8 +1804,12 @@ static int homotopyAlgorithm(DATA_HOMOTOPY* solverData, double *x)
         /* report solver abortion */
         solverData->info=-1;
         /* debug information */
-        debugString(LOG_NLS_HOMOTOPY, "Assert, because tau cannot be decreased anymore and current tau already failed!");
-        debugString(LOG_NLS_HOMOTOPY, "Homotopy Algorithm did not converge");
+        if (solverData->initHomotopy)
+            warningStreamPrint(LOG_ASSERT, 0, "Homotopy algorithm did not converge.\nThe step size tau cannot be decreased anymore and current tau=%g already failed.\nYou can influence the calculation of tau with the following flags:\n\t-homTauDecFac=<value>\n\t-homTauDecFacPredictor=<value>\n\t-homTauIncFac=<value>\n\t-homTauIncThreshold=<value>\n\t-homTauMax=<value>\n\t-homTauMin=<value>\n\t-homTauStart=<value>\nYou can also set the threshold for accepting the current bending with:\n\t-homAdaptBend=<value>\nYou can use -lv=LOG_INIT,LOG_NLS_HOMOTOPY to get more information.", tau);
+        else {
+          debugString(LOG_NLS_HOMOTOPY, "Assert, because tau cannot be decreased anymore and current tau already failed!");
+          debugString(LOG_NLS_HOMOTOPY, "Homotopy algorithm did not converge");
+        }
         debugString(LOG_NLS_HOMOTOPY, "======================================================");
         /* update statistics */
         return -1;
@@ -1892,7 +1915,10 @@ static int homotopyAlgorithm(DATA_HOMOTOPY* solverData, double *x)
       if (bend<DBL_EPSILON)
       {
         /* debug information */
-        debugString(LOG_NLS_HOMOTOPY, "\nINCREMENT ZERO: Homotopy Algorithm did not converge\n");
+        if (solverData->initHomotopy)
+          warningStreamPrint(LOG_ASSERT, 0, "Homotopy algorithm did not converge.\nThe value specifying the bending of the homotopy curve is smaller than DBL_EPSILON (increment zero).\nYou can use -lv=LOG_INIT,LOG_NLS_HOMOTOPY to get more information.");
+        else
+          debugString(LOG_NLS_HOMOTOPY, "\nINCREMENT ZERO: Homotopy algorithm did not converge\n");
         debugString(LOG_NLS_HOMOTOPY, "======================================================");
         /* update statistics */
         return -1;
