@@ -2323,8 +2323,15 @@ int solveHomotopy(DATA *data, threadData_t *threadData, int sysNumber)
     {
       skipNewton = 1;
       giveUp = runHomotopy>=3;
-    } else
-    {
+
+    } else if (solverData->initHomotopy && solverData->info==1) {
+      /* take the solution */
+      vecCopy(solverData->n, solverData->x, systemData->nlsx);
+      debugVectorDouble(LOG_NLS_V,"Solution", solverData->x, solverData->n);
+      success = 1;
+    }
+
+    else {
       assert = 1;
 #ifndef OMC_EMCC
       MMC_TRY_INTERNAL(simulationJumpBuffer)
