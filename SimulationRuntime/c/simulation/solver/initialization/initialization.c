@@ -281,6 +281,11 @@ static int symbolic_initialization(DATA *data, threadData_t *threadData)
     }
     data->simulationInfo->homotopyUsed = 1;
     messageClose(LOG_INIT);
+
+#if !defined(OMC_NO_FILESYSTEM)
+    if(ACTIVE_STREAM(LOG_INIT))
+      fclose(pFile);
+#endif
   }
 
   /* If there is homotopy in the model and the new global homotopy approach is activated
@@ -288,20 +293,6 @@ static int symbolic_initialization(DATA *data, threadData_t *threadData)
      use NEW GLOBAL HOMOTOPY APPROACH. */
   if (data->callback->useHomotopy == 2 && solveWithGlobalHomotopy)
   {
-    // char buffer[4096];
-
-// #if !defined(OMC_NO_FILESYSTEM)
-    // if(ACTIVE_STREAM(LOG_INIT))
-    // {
-      // sprintf(buffer, "%s_global_homotopy.csv", mData->modelFilePrefix);
-      // pFile = fopen(buffer, "wt");
-      // fprintf(pFile, "\"sep=,\"\n%s", "lambda");
-      // for(i=0; i<mData->nVariablesReal; ++i)
-        // fprintf(pFile, ",%s", mData->realVarsData[i].info.name);
-      // fprintf(pFile, "\n");
-    // }
-// #endif
-
     infoStreamPrint(LOG_INIT, 1, "homotopy process\n---------------------------");
 
     // Solve lambda0-DAE
@@ -309,16 +300,6 @@ static int symbolic_initialization(DATA *data, threadData_t *threadData)
     infoStreamPrint(LOG_INIT, 0, "solve simplified lambda0-DAE");
     data->callback->functionInitialEquations_lambda0(data, threadData);
     infoStreamPrint(LOG_INIT, 0, "solving simplified lambda0-DAE done\n---------------------------");
-
-// #if !defined(OMC_NO_FILESYSTEM)
-    // if(ACTIVE_STREAM(LOG_INIT))
-    // {
-      // fprintf(pFile, "%.16g", data->simulationInfo->lambda);
-      // for(i=0; i<mData->nVariablesReal; ++i)
-        // fprintf(pFile, ",%.16g", data->localData[0]->realVars[i]);
-      // fprintf(pFile, "\n");
-    // }
-// #endif
 
     // Run along the homotopy path and solve the actual system
     infoStreamPrint(LOG_INIT, 0, "run along the homotopy path and solve the actual system");
@@ -329,11 +310,6 @@ static int symbolic_initialization(DATA *data, threadData_t *threadData)
   }
 
   storeRelations(data);
-
-#if !defined(OMC_NO_FILESYSTEM)
-  if(data->callback->useHomotopy == 1 && solveWithGlobalHomotopy && ACTIVE_STREAM(LOG_INIT))
-    fclose(pFile);
-#endif
 
   /* check for over-determined systems */
   retVal = data->callback->functionRemovedInitialEquations(data, threadData);

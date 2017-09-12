@@ -991,47 +991,6 @@ static int wrapper_fvec_homotopy_fixpoint_der(DATA_HOMOTOPY* solverData, double*
   return 0;
 }
 
-/*! \fn wrapper_fvec_homotopy_initialization for the residual Function
- *
- *  \author ptaeuber
- *
- */
-static int wrapper_fvec_homotopy_initialization(DATA_HOMOTOPY* solverData, double* x, double* h)
-{
-  int i;
-  int n = solverData->n;
-
-  /*  Newton homotopy */
-  wrapper_fvec(solverData, x, solverData->f1);
-  vecAddScal(solverData->n, solverData->f1, solverData->fx0, - (1-x[n]), h);
-  debugVectorDouble(LOG_NLS_HOMOTOPY, "h:", h, n);
-  h = solverData->f1;
-  debugVectorDouble(LOG_NLS_HOMOTOPY, "h:", h, n);
-
-  return 0;
-}
-
-/*! \fn wrapper_fvec_homotopy_initialization_der for the residual Function
- *
- *  \author ptaeuber
- *
- */
-static int wrapper_fvec_homotopy_initialization_der(DATA_HOMOTOPY* solverData, double* x, double* hJac)
-{
-  int i, j;
-  int n = solverData->n;
-
-  /* Newton homotopy */
-  wrapper_fvec_der(solverData, x, hJac);
-
-
-  /* add f(x0) as the last column of the Jacobian*/
-  // vecCopy(n, solverData->fx0, hJac + n*n);
-  // debugMatrixDouble(LOG_NLS_JAC,"Jacobian hJac:",hJac, n, n+1);
-
-  return 0;
-}
-
 /*! \fn getIndicesOfPivotElement for calculating pivot element
  *
  *  \author bbachmann
@@ -1946,6 +1905,7 @@ static int homotopyAlgorithm(DATA_HOMOTOPY* solverData, double *x)
       vecCopy(solverData->m, solverData->dy0, solverData->dy2);
       debugString(LOG_NLS_HOMOTOPY, "Successfull homotopy step!\n======================================================");
       printHomotopyUnknowns(LOG_NLS_HOMOTOPY, solverData);
+
 #if !defined(OMC_NO_FILESYSTEM)
       if(solverData->initHomotopy && ACTIVE_STREAM(LOG_INIT))
       {
@@ -2275,15 +2235,15 @@ int solveHomotopy(DATA *data, threadData_t *threadData, int sysNumber)
 
     if (solverData->initHomotopy) {
       if (runHomotopy == 1) {
-        solverData->h_function = wrapper_fvec_homotopy_initialization;
-        solverData->hJac_dh = wrapper_fvec_homotopy_initialization_der;
+        solverData->h_function = wrapper_fvec;
+        solverData->hJac_dh = wrapper_fvec_der;
         solverData->startDirection = 1.0;
         debugDouble(LOG_INIT,"STARTING HOMOTOPY METHOD; startDirection = ", solverData->startDirection);
       }
 
       if (runHomotopy == 2) {
-        solverData->h_function = wrapper_fvec_homotopy_initialization;
-        solverData->hJac_dh = wrapper_fvec_homotopy_initialization_der;
+        solverData->h_function = wrapper_fvec;
+        solverData->hJac_dh = wrapper_fvec_der;
         solverData->startDirection = -1.0;
         debugDouble(LOG_INIT,"STARTING HOMOTOPY METHOD; startDirection = ", solverData->startDirection);
       }
