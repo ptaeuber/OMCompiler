@@ -1606,6 +1606,7 @@ static int homotopyAlgorithm(DATA_HOMOTOPY* solverData, double *x)
     if(solverData->initHomotopy && ACTIVE_STREAM(LOG_INIT))
     {
       sprintf(buffer, "%s_syst%d_new_global_homotopy_%s.csv", solverData->data->modelData->modelFilePrefix, solverData->sysNumber, solverData->startDirection > 0 ? "pos" : "neg");
+      infoStreamPrint(LOG_INIT, 0, "The homotopy path will be exported to %s.", buffer);
       pFile = fopen(buffer, "wt");
       fprintf(pFile, "\"sep=,\"\n");
       fprintf(pFile, "%s", modelInfoGetEquation(&solverData->data->modelData->modelDataXml,solverData->eqSystemNumber).vars[n]);
