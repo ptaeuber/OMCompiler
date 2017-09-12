@@ -7579,7 +7579,7 @@ protected function allInitOptimizationModules
     (BackendDAEOptimize.simplifyLoops, "simplifyLoops"),
     (Tearing.recursiveTearing, "recursiveTearing"),
     (ExpressionSolve.solveSimpleEquations, "solveSimpleEquations"),
-    (BackendDAEOptimize.generateHomotopyComponents, "generateHomotopyComponents"), // after tearing, before calculateStrongComponentJacobians
+    (BackendDAEOptimize.generateHomotopyComponents, "generateHomotopyComponents"), // after tearing, after solveSimpleEquations, before calculateStrongComponentJacobians
     (SymbolicJacobian.calculateStrongComponentJacobians, "calculateStrongComponentJacobians"),
     (BackendDAEOptimize.simplifyAllExpressions, "simplifyAllExpressions"),
     (SymbolicJacobian.inputDerivativesUsed, "inputDerivativesUsed"),
