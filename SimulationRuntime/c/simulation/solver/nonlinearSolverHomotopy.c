@@ -493,7 +493,7 @@ void debugVectorDouble(int logName, char* vectorName, double* vector, int n)
   }
 }
 
-void debugVectorInt(int logName, char* vectorName, modelica_boolean* vector, int n)
+void debugVectorBool(int logName, char* vectorName, modelica_boolean* vector, int n)
 {
    if(ACTIVE_STREAM(logName))
   {
@@ -510,6 +510,30 @@ void debugVectorInt(int logName, char* vectorName, modelica_boolean* vector, int
         sprintf(buffer, "%s +INF ", buffer);
       else
         sprintf(buffer, "%s   %d", buffer, vector[i]);
+    }
+    infoStreamPrint(logName, 0, "%s", buffer);
+    messageClose(logName);
+    free(buffer);
+  }
+}
+
+void debugVectorInt(int logName, char* vectorName, int* vector, int n)
+{
+  if(ACTIVE_STREAM(logName))
+  {
+    int i;
+    char *buffer = (char*)malloc(sizeof(char)*n*20);
+
+    infoStreamPrint(logName, 1, "%s [%d-dim]", vectorName, n);
+    buffer[0] = 0;
+    for(i=0; i<n;i++)
+    {
+      if (vector[i]<-1e+300)
+        sprintf(buffer, "%s -INF ", buffer);
+      else if (vector[i]>1e+300)
+        sprintf(buffer, "%s +INF ", buffer);
+      else
+        sprintf(buffer, "%s%d ", buffer, vector[i]);
     }
     infoStreamPrint(logName, 0, "%s", buffer);
     messageClose(logName);
@@ -1047,13 +1071,11 @@ static int wrapper_fvec_homotopy_fixpoint_der(DATA_HOMOTOPY* solverData, double*
  */
 int solveSystemWithTotalPivotSearch(int n, double* x, double* A, int* indRow, int* indCol, int *pos, int *rank, int casualTearingSet)
 {
-   int i, k, j, l, m=n+1, nrsh=1, singular=0, nPivot=n;
+   int i, k, j, m=n+1, nPivot=n;
    int pCol, pRow;
    double hValue;
    double hInt;
    double absMax, detJac;
-   int r,s;
-   double *res;
    int returnValue = 0;
 
    debugMatrixDouble(LOG_NLS_JAC,"Linear System Matrix [Jac res]:",A, n, m);
@@ -1140,10 +1162,14 @@ int solveSystemWithTotalPivotSearch(int n, double* x, double* A, int* indRow, in
     }
   }
   x[indCol[n]]=1.0;
+  debugVectorInt(LOG_NLS_V,"indRow:", indRow, n);
+  debugVectorInt(LOG_NLS_V,"indCol:", indCol, n+1);
+  debugVectorDouble(LOG_NLS_V,"vector x (solution):", x, n+1);
 
   /* Return position of largest value (1.0) */
   if (*pos<0) {
     *pos=indCol[n];
+    debugInt(LOG_NLS_V,"position of largest value = ", *pos);
   }
 
   return returnValue;
@@ -1745,7 +1771,11 @@ static int homotopyAlgorithm(DATA_HOMOTOPY* solverData, double *x)
         /* update statistics */
         return -1;
       }
+      /* Scaling back to original variables */
       vecMultScaling(solverData->m, solverData->dy0, solverData->xScaling, solverData->dy0);
+      debugDouble(LOG_NLS_HOMOTOPY,"length of scaled tangent vector: ", vec2Norm(solverData->m, solverData->dy0));
+      // vecNormalize(solverData->m, solverData->dy0, solverData->dy0);
+      // debugDouble(LOG_NLS_HOMOTOPY,"length of normalized tangent vector: ", vec2Norm(solverData->m, solverData->dy0));
 
       /* Correct search direction, depending on the last direction (angle < 90 degree) */
       vecScalarProduct = vecScalarProd(solverData->m,solverData->dy0,solverData->dy2);
@@ -1843,6 +1873,7 @@ static int homotopyAlgorithm(DATA_HOMOTOPY* solverData, double *x)
       debugVectorDouble(LOG_NLS_HOMOTOPY, "residuum scaling of function h:", solverData->resScaling, solverData->n);
 
       /* copy vector h to column "pos" of the jacobian */
+      debugVectorDouble(LOG_NLS_HOMOTOPY, "copy vector hvec to column 'pos' of the jacobian: ", solverData->hvec, solverData->n);
       vecCopy(solverData->n, solverData->hvec, solverData->hJac + pos*solverData->n);
       scaleMatrixRows(solverData->n, solverData->m, solverData->hJac);
       if (solveSystemWithTotalPivotSearch(solverData->n, solverData->dy1, solverData->hJac, solverData->indRow, solverData->indCol, &pos, &rank, solverData->casualTearingSet) == -1)
@@ -1853,10 +1884,12 @@ static int homotopyAlgorithm(DATA_HOMOTOPY* solverData, double *x)
       }
       /* Scaling back to original variables */
       vecMultScaling(solverData->m, solverData->dy1, solverData->xScaling, solverData->dy1);
+      debugVectorDouble(LOG_NLS_HOMOTOPY, "solution (original scaling): ", solverData->dy1, solverData->m);
 
       solverData->dy1[pos] = 0.0;
       vecAdd(solverData->m, solverData->y1, solverData->dy1, solverData->y2);
       vecCopy(solverData->m, solverData->y2, solverData->y1);
+      debugVectorDouble(LOG_NLS_HOMOTOPY, "new y in newton: ", solverData->y1, solverData->m);
       assert = 1;
 #ifndef OMC_EMCC
     MMC_TRY_INTERNAL(simulationJumpBuffer)
@@ -2214,8 +2247,8 @@ int solveHomotopy(DATA *data, threadData_t *threadData, int sysNumber)
       /* This case may be switched off, because of event chattering!!!*/
       if(mixedSystem && data->simulationInfo->discreteCall && (alreadyTested<1))
       {
-        debugVectorInt(LOG_NLS_V,"Relations Pre vector ", ((DATA*)data)->simulationInfo->relationsPre, ((DATA*)data)->modelData->nRelations);
-        debugVectorInt(LOG_NLS_V,"Relations Backup vector ", relationsPreBackup, ((DATA*)data)->modelData->nRelations);
+        debugVectorBool(LOG_NLS_V,"Relations Pre vector ", ((DATA*)data)->simulationInfo->relationsPre, ((DATA*)data)->modelData->nRelations);
+        debugVectorBool(LOG_NLS_V,"Relations Backup vector ", relationsPreBackup, ((DATA*)data)->modelData->nRelations);
         ((DATA*)data)->simulationInfo->solveContinuous = 0;
 
         if (solverData->casualTearingSet){
@@ -2228,7 +2261,7 @@ int solveHomotopy(DATA *data, threadData_t *threadData, int sysNumber)
         else
           solverData->f(solverData, solverData->x, solverData->f1);
 
-        debugVectorInt(LOG_NLS_V,"Relations vector ", ((DATA*)data)->simulationInfo->relations, ((DATA*)data)->modelData->nRelations);
+        debugVectorBool(LOG_NLS_V,"Relations vector ", ((DATA*)data)->simulationInfo->relations, ((DATA*)data)->modelData->nRelations);
         if (isNotEqualVectorInt(((DATA*)data)->modelData->nRelations, ((DATA*)data)->simulationInfo->relations, relationsPreBackup)>0)
         {
           /* re-run the solution process, since relations in the system have changed */
