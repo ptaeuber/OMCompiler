@@ -48,6 +48,7 @@ const char *FLAG_NAME[FLAG_MAX+1] = {
   /* FLAG_F */                            "f",
   /* FLAG_HELP */                         "help",
   /* FLAG_HOMOTOPY_ADAPT_BEND */          "homAdaptBend",
+  /* FLAG_HOMOTOPY_BACKTRACE_STRATEGY */  "homBacktraceStrategy",
   /* FLAG_HOMOTOPY_H_EPS */               "homHEps",
   /* FLAG_HOMOTOPY_MAX_LAMBDA_STEPS */    "homMaxLambdaSteps",
   /* FLAG_HOMOTOPY_MAX_NEWTON_STEPS */    "homMaxNewtonSteps",
@@ -157,6 +158,7 @@ const char *FLAG_DESC[FLAG_MAX+1] = {
   /* FLAG_F */                            "value specifies a new setup XML file to the generated simulation code",
   /* FLAG_HELP */                         "get detailed information that specifies the command-line flag",
   /* FLAG_HOMOTOPY_ADAPT_BEND */          "[double (default 0.5)] maximum trajectory bending to accept the homotopy step",
+  /* FLAG_HOMOTOPY_BACKTRACE_STRATEGY */  "value specifies the backtrace strategy in the homotopy corrector step (fix (default), orthogonal)",
   /* FLAG_HOMOTOPY_H_EPS */               "[double (default 1e-5)] tolerance respecting residuals for the homotopy H-function",
   /* FLAG_HOMOTOPY_MAX_LAMBDA_STEPS */    "[int (default size dependent)] maximum lambda steps allowed to run the homotopy path",
   /* FLAG_HOMOTOPY_MAX_NEWTON_STEPS */    "[int (default 20)] maximum newton steps in the homotopy corrector step",
@@ -288,6 +290,10 @@ const char *FLAG_DETAILED_DESC[FLAG_MAX+1] = {
   "  For example, -help=f prints detailed information for command-line flag f.",
   /* FLAG_HOMOTOPY_ADAPT_BEND */
   "  maximum trajectory bending to accept the homotopy step",
+  /* FLAG_HOMOTOPY_BACKTRACE_STRATEGY */
+  "  Value specifies the backtrace strategy in the homotopy corrector step. Valid values:\n"
+  "  * fix - default, go back to the path by fixing one coordinate\n"
+  "  * orthogonal - go back to the path in an orthogonal direction to the tangent vector",
   /* FLAG_HOMOTOPY_H_EPS */
   "  tolerance respecting residuals for the homotopy H-function",
   /* FLAG_HOMOTOPY_MAX_LAMBDA_STEPS */
@@ -540,6 +546,7 @@ const int FLAG_TYPE[FLAG_MAX] = {
   /* FLAG_F */                            FLAG_TYPE_OPTION,
   /* FLAG_HELP */                         FLAG_TYPE_OPTION,
   /* FLAG_HOMOTOPY_ADAPT_BEND */          FLAG_TYPE_OPTION,
+  /* FLAG_HOMOTOPY_BACKTRACE_STRATEGY */  FLAG_TYPE_OPTION,
   /* FLAG_HOMOTOPY_H_EPS */               FLAG_TYPE_OPTION,
   /* FLAG_HOMOTOPY_MAX_LAMBDA_STEPS */    FLAG_TYPE_OPTION,
   /* FLAG_HOMOTOPY_MAX_NEWTON_STEPS */    FLAG_TYPE_OPTION,
@@ -860,4 +867,18 @@ const char *IMPRK_LS_METHOD_DESC[IMPRK_LS_MAX] = {
 
   "use sparse iterative solvers",
   "use direct dense method"
+};
+
+const char *HOM_BACK_STRAT_NAME[HOM_BACK_STRAT_MAX] = {
+  "HOM_BACK_STRAT_UNKNOWN",
+
+  /* HOM_BACK_STRAT_FIX */         "fix",
+  /* HOM_BACK_STRAT_ORTHOGONAL */  "orthogonal"
+};
+
+const char *HOM_BACK_STRAT_DESC[HOM_BACK_STRAT_MAX] = {
+  "unknown",
+
+  /* HOM_BACK_STRAT_FIX */          "go back to the path by fixing one coordinate",
+  /* HOM_BACK_STRAT_ORTHOGONAL */   "go back to the path in an orthogonal direction to the tangent vector"
 };
