@@ -1757,6 +1757,9 @@ static int homotopyAlgorithm(DATA_HOMOTOPY* solverData, double *x)
 
     stepAccept = 0;
 
+    /****************************************************************************
+     * Predictor step: Calculation of tangent vector!                           *
+     ****************************************************************************/
     /* If a step succeeded, calculate the homotopy function and corresponding jacobian */
     if (iter==0)
     {
@@ -1872,7 +1875,9 @@ static int homotopyAlgorithm(DATA_HOMOTOPY* solverData, double *x)
     solverData->tau = tau;
     printHomotopyPredictorStep(LOG_NLS_HOMOTOPY, solverData);
 
-    /* Corrector step: Newton iteration! */
+    /****************************************************************************
+     * Corrector step: Newton iteration!                                        *
+     ****************************************************************************/
     debugString(LOG_NLS_HOMOTOPY, "Newton iteration for corrector step begins!");
     if (correctorStrategy==1)
       debugString(LOG_NLS_HOMOTOPY, "Using backtrace strategy with one fixed coordinate! To change this use: '-homBacktraceStrategy=orthogonal'");
@@ -1916,7 +1921,15 @@ static int homotopyAlgorithm(DATA_HOMOTOPY* solverData, double *x)
       matVecMultAbs(solverData->n, solverData->m, solverData->hJac, solverData->ones, solverData->resScaling);
       debugVectorDouble(LOG_NLS_HOMOTOPY, "residuum scaling of function h:", solverData->resScaling, solverData->n);
 
-      if (correctorStrategy==1)
+      /* If this is the last step, use backtrace strategy with one fixed coordinate and fix lambda */
+      if (solverData->yt[solverData->n] == 1)
+      {
+        debugString(LOG_NLS_HOMOTOPY, "Fix lambda, because this is the last step!");
+        correctorStrategy = 1;
+        pos = solverData->n;
+      }
+
+      if (correctorStrategy==1) // fix one coordinate
       {
         /* copy vector h to column "pos" of the jacobian */
         debugVectorDouble(LOG_NLS_HOMOTOPY, "copy vector hvec to column 'pos' of the jacobian: ", solverData->hvec, solverData->n);
@@ -1930,7 +1943,7 @@ static int homotopyAlgorithm(DATA_HOMOTOPY* solverData, double *x)
         }
         solverData->dy1[pos] = 0.0;
       }
-      else
+      else // go back in orthogonal direction to tangent vector
       {
         scaleMatrixRows(solverData->n+1, solverData->m+1, solverData->hJac2);
         pos = solverData->n+1;
@@ -2058,6 +2071,7 @@ static int homotopyAlgorithm(DATA_HOMOTOPY* solverData, double *x)
   vecCopy(solverData->n, solverData->y1, x);
 
   debugString(LOG_NLS_HOMOTOPY, "HOMOTOPY ALGORITHM SUCCEEDED");
+  debugInt(LOG_INIT, "Total number of lambda steps:", numSteps+2);
   debugString(LOG_NLS_HOMOTOPY, "======================================================");
   solverData->info = 1;
 
