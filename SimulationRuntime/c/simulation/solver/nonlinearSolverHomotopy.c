@@ -213,7 +213,7 @@ int allocateHomotopyData(int size, void** voiddata)
   data->y2 = (double*) calloc((size+1),sizeof(double));
   data->yt = (double*) calloc((size+1),sizeof(double));
   data->dy0 = (double*) calloc((size+1),sizeof(double));
-  data->dy1 = (double*) calloc((size+2),sizeof(double));
+  data->dy1 = (double*) calloc((size+homBacktraceStrategy),sizeof(double));
   data->dy2 = (double*) calloc((size+1),sizeof(double));
   data->hvec = (double*) calloc(size,sizeof(double));
   data->hJac  = (double*) calloc(size*(size+1),sizeof(double));
@@ -222,8 +222,8 @@ int allocateHomotopyData(int size, void** voiddata)
   data->ones  = (double*) calloc(size+1,sizeof(double));
 
   /* linear system */
-  data->indRow =(int*) calloc(size,sizeof(int));
-  data->indCol =(int*) calloc(size+1,sizeof(int));
+  data->indRow =(int*) calloc(size+homBacktraceStrategy-1,sizeof(int));
+  data->indCol =(int*) calloc(size+homBacktraceStrategy,sizeof(int));
 
   allocateHybrdData(size, &data->dataHybrid);
 
@@ -1669,6 +1669,7 @@ static int homotopyAlgorithm(DATA_HOMOTOPY* solverData, double *x)
   double tau = homTauStart, tauMax = homTauMax, tauMin = homTauMin, hEps = homHEps, adaptBend = homAdaptBend;
   double tauDecreasingFactor = homTauDecreasingFactor, tauDecreasingFactorPredictor = homTauDecreasingFactorPredictor;
   double tauIncreasingFactor = homTauIncreasingFactor, tauIncreasingThreshold = homTauIncreasingThreshold;
+  double preTau;
   int m = solverData->m;
   int n = solverData->n;
   int initialStep = 1;
@@ -1724,8 +1725,12 @@ static int homotopyAlgorithm(DATA_HOMOTOPY* solverData, double *x)
     /* Break loop, iff algorithm gets stuck or lambda accelerates to the wrong direction */
     if (iter>=maxTries)
     {
-      if (solverData->initHomotopy)
-        warningStreamPrint(LOG_ASSERT, 0, "Homotopy algorithm did not converge.\nThe maximum number of tries for one lambda is reached (%d).\nYou can change the number of tries with:\n\t-homMaxTries=<value>\nYou can also try to allow more newton steps in the corrector step with:\n\t-homMaxNewtonSteps=<value>\nor change the tolerance for the solution with:\n\t-homHEps=<value>\nYou can also try to use another backtrace stategy in the corrector step with:\n\t-homBacktraceStategy=<fix|orthogonal>\nYou can use -lv=LOG_INIT,LOG_NLS_HOMOTOPY to get more information.", iter);
+      if (solverData->initHomotopy) {
+        if (preTau == tau)
+          warningStreamPrint(LOG_ASSERT, 0, "Homotopy algorithm did not converge.\nNo solution for current step size tau found and tau cannot be decreased any further.\nYou can set the minimum step size tau with:\n\t-homTauMin=<value>\nYou can also try to allow more newton steps in the corrector step with:\n\t-homMaxNewtonSteps=<value>\nor change the tolerance for the solution with:\n\t-homHEps=<value>\nYou can also try to use another backtrace stategy in the corrector step with:\n\t-homBacktraceStrategy=<fix|orthogonal>\nYou can use -lv=LOG_INIT,LOG_NLS_HOMOTOPY to get more information.");
+        else
+          warningStreamPrint(LOG_ASSERT, 0, "Homotopy algorithm did not converge.\nThe maximum number of tries for one lambda is reached (%d).\nYou can change the number of tries with:\n\t-homMaxTries=<value>\nYou can also try to allow more newton steps in the corrector step with:\n\t-homMaxNewtonSteps=<value>\nor change the tolerance for the solution with:\n\t-homHEps=<value>\nYou can also try to use another backtrace stategy in the corrector step with:\n\t-homBacktraceStrategy=<fix|orthogonal>\nYou can use -lv=LOG_INIT,LOG_NLS_HOMOTOPY to get more information.", iter);
+      }
       else
         debugInt(LOG_NLS_HOMOTOPY, "Homotopy algorithm did not converge: iter = ", iter);
       debugString(LOG_NLS_HOMOTOPY, "======================================================");
@@ -1743,7 +1748,7 @@ static int homotopyAlgorithm(DATA_HOMOTOPY* solverData, double *x)
     if (numSteps >= maxLambdaSteps)
     {
       if (solverData->initHomotopy)
-        warningStreamPrint(LOG_ASSERT, 0, "Homotopy algorithm did not converge.\nThe maximum number of lambda steps is reached (%d).\nYou can change the maximum number of lambda steps with:\n\t-homMaxLambdaSteps=<value>\nYou can also try to influence the step size tau with the following flags:\n\t-homTauDecFac=<value>\n\t-homTauDecFacPredictor=<value>\n\t-homTauIncFac=<value>\n\t-homTauIncThreshold=<value>\n\t-homTauMax=<value>\n\t-homTauMin=<value>\n\t-homTauStart=<value>\nor you can also set the threshold for accepting the current bending with:\n\t-homAdaptBend=<value>\nYou can also try to use another backtrace stategy in the corrector step with:\n\t-homBacktraceStategy=<fix|orthogonal>\nYou can use -lv=LOG_INIT,LOG_NLS_HOMOTOPY to get more information.", maxLambdaSteps);
+        warningStreamPrint(LOG_ASSERT, 0, "Homotopy algorithm did not converge.\nThe maximum number of lambda steps is reached (%d).\nYou can change the maximum number of lambda steps with:\n\t-homMaxLambdaSteps=<value>\nYou can also try to influence the step size tau with the following flags:\n\t-homTauDecFac=<value>\n\t-homTauDecFacPredictor=<value>\n\t-homTauIncFac=<value>\n\t-homTauIncThreshold=<value>\n\t-homTauMax=<value>\n\t-homTauMin=<value>\n\t-homTauStart=<value>\nor you can also set the threshold for accepting the current bending with:\n\t-homAdaptBend=<value>\nYou can also try to use another backtrace stategy in the corrector step with:\n\t-homBacktraceStrategy=<fix|orthogonal>\nYou can use -lv=LOG_INIT,LOG_NLS_HOMOTOPY to get more information.", maxLambdaSteps);
       else
         debugInt(LOG_NLS_HOMOTOPY, "Homotopy algorithm did not converge: numSteps = ", numSteps);
       debugString(LOG_NLS_HOMOTOPY, "======================================================");
@@ -2009,10 +2014,14 @@ static int homotopyAlgorithm(DATA_HOMOTOPY* solverData, double *x)
       debugString(LOG_NLS_HOMOTOPY, "The relation between the vector length of corrector step and predictor step is too big:");
       debugDouble(LOG_NLS_HOMOTOPY, "bend/adaptBend  =", bend/adaptBend);
       debugString(LOG_NLS_HOMOTOPY, "--- decreasing step size tau in corrector step!");
-      debugDouble(LOG_NLS_HOMOTOPY, "old tau =", tau);
+      preTau = tau;
+      debugDouble(LOG_NLS_HOMOTOPY, "old tau =", preTau);
       tau = fmax(tauMin,tau/tauDecreasingFactor);
       debugDouble(LOG_NLS_HOMOTOPY, "new tau =", tau);
-      iter++;
+      if (tau==preTau)
+        iter = maxTries;
+      else
+        iter++;
     } else
     {
       initialStep = 0;
@@ -2373,6 +2382,7 @@ int solveHomotopy(DATA *data, threadData_t *threadData, int sysNumber)
         solverData->h_function = wrapper_fvec;
         solverData->hJac_dh = wrapper_fvec_der;
         solverData->startDirection = omc_flag[FLAG_HOMOTOPY_NEG_START_DIR] ? 1.0 : -1.0;
+        infoStreamPrint(LOG_ASSERT, 0, "The homotopy algorithm is started again with opposing start direction.");
         debugInt(LOG_INIT, "Homotopy run: ", runHomotopy);
         debugDouble(LOG_INIT,"Try again with startDirection = ", solverData->startDirection);
       }
