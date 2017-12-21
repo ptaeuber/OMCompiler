@@ -296,14 +296,14 @@ const char *FLAG_DETAILED_DESC[FLAG_MAX+1] = {
   "  * fix - default, go back to the path by fixing one coordinate\n"
   "  * orthogonal - go back to the path in an orthogonal direction to the tangent vector",
   /* FLAG_HOMOTOPY_H_EPS */
-  "  Tolerance respecting residuals for the homotopy H-function.\n"
+  "  Tolerance respecting residuals for the homotopy H-function (default: 1e-5).\n"
   "  In the last step (lambda=1) newtonFTol is used as tolerance.",
   /* FLAG_HOMOTOPY_MAX_LAMBDA_STEPS */
-  "  Maximum lambda steps allowed to run the homotopy path.",
+  "  Maximum lambda steps allowed to run the homotopy path (default: system size * 100).",
   /* FLAG_HOMOTOPY_MAX_NEWTON_STEPS */
-  "  Maximum newton steps in the homotopy corrector step.",
+  "  Maximum newton steps in the homotopy corrector step (default: 20).",
   /* FLAG_HOMOTOPY_MAX_TRIES */
-  "  Maximum number of tries for one homotopy lambda step.",
+  "  Maximum number of tries for one homotopy lambda step (default: 10).",
   /* FLAG_HOMOTOPY_NEG_START_DIR */
   "  Start to run along the homotopy path in the negative direction.\n"
   "  If one direction fails, the other direction is always used as fallback option.",
@@ -311,19 +311,19 @@ const char *FLAG_DETAILED_DESC[FLAG_MAX+1] = {
   "  If the model contains the homotopy operator, directly use the homotopy method to solve the initialization problem.\n"
   "  Without this flag, the solver first tries to solve the initialization problem without homotopy and only uses homotopy as fallback option.",
   /* FLAG_HOMOTOPY_TAU_DEC_FACTOR */
-  "  Decrease homotopy step size tau by this factor if tau is too big in the homotopy corrector step.",
+  "  Decrease homotopy step size tau by this factor if tau is too big in the homotopy corrector step (default: 10.0).",
   /* FLAG_HOMOTOPY_TAU_DEC_FACTOR_PRED */
-  "  Decrease homotopy step size tau by this factor if tau is too big in the homotopy predictor step.",
+  "  Decrease homotopy step size tau by this factor if tau is too big in the homotopy predictor step (default: 2.0).",
   /* FLAG_HOMOTOPY_TAU_INC_FACTOR */
-  "  Increase homotopy step size tau by this factor if tau can be increased after the homotopy corrector step.",
+  "  Increase homotopy step size tau by this factor if tau can be increased after the homotopy corrector step (default: 2.0).",
   /* FLAG_HOMOTOPY_TAU_INC_THRESHOLD */
-  "  Increase the homotopy step size tau if homAdaptBend/bend > homTauIncThreshold.",
+  "  Increase the homotopy step size tau if homAdaptBend/bend > homTauIncThreshold (default: 10).",
   /* FLAG_HOMOTOPY_TAU_MAX */
-  "  Maximum homotopy step size tau for the homotopy process.",
+  "  Maximum homotopy step size tau for the homotopy process (default: 10).",
   /* FLAG_HOMOTOPY_TAU_MIN */
-  "  Minimum homotopy step size tau for the homotopy process.",
+  "  Minimum homotopy step size tau for the homotopy process (default: 1e-4).",
   /* FLAG_HOMOTOPY_TAU_START */
-  "  Homotopy step size tau at the beginning of the homotopy process.",
+  "  Homotopy step size tau at the beginning of the homotopy process (default: 0.2).",
   /* FLAG_IDA_MAXERRORTESTFAIL */
   "  Value specifies the maximum number of error test failures in attempting one step. The default value is 7.",
   /* FLAG_IDA_MAXNONLINITERS */
