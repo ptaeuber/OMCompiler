@@ -234,7 +234,6 @@ static void readFlag(int *flag, int max, const char *value, const char *flagName
   for (i=1; i<max; ++i) {
     if (0 == strcmp(value, names[i])) {
       *flag = i;
-      infoStreamPrint(LOG_STDOUT, 0, "Set %s=%s from command line.", flagName, value);
       return;
     }
   }
