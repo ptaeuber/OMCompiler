@@ -121,7 +121,6 @@ typedef struct DATA_HOMOTOPY
   double* debug_dx;
 
   /* homotopy parameters */
-  int homotopyMethod;
   int initHomotopy; /* homotopy method used for the initialization with lambda from the homotopy()-operator */
   double startDirection;
   double  tau;
@@ -1644,28 +1643,17 @@ static int newtonAlgorithm(DATA_HOMOTOPY* solverData, double* x)
 static int homotopyAlgorithm(DATA_HOMOTOPY* solverData, double *x)
 {
   int i, j;
-  double xerror = -1, xerror_scaled = -1;
   double error_h, error_h_scaled, delta_x;
-  int success = 0;
-  int nfunc_evals = 0;
-  int continuous = 1;
-  double local_tol = solverData->ftol_sqrd;
   double vecScalarProduct;
 
-  int giveUp = 0;
-  int retries = 0;
-  int retries2 = 0;
-  int iflag = 1;
   int pos, rank;
   int iter = 0;
   int maxiter = homMaxNewtonSteps;
   int maxTries = homMaxTries;
   int numSteps = 0;
   int stepAccept = 0;
-  int runHomotopy = 0;
   int correctorStrategy = homBacktraceStrategy; /* 1: go back to the path by fixing one coordinate, 2: go back to the path in an orthogonal direction to the tangent vector */
   double bend = 0;
-  double sProd, detJac;
   double tau = homTauStart, tauMax = homTauMax, tauMin = homTauMin, hEps = homHEps, adaptBend = homAdaptBend;
   double tauDecreasingFactor = homTauDecreasingFactor, tauDecreasingFactorPredictor = homTauDecreasingFactorPredictor;
   double tauIncreasingFactor = homTauIncreasingFactor, tauIncreasingThreshold = homTauIncreasingThreshold;
@@ -1879,10 +1867,22 @@ static int homotopyAlgorithm(DATA_HOMOTOPY* solverData, double *x)
      * Corrector step: Newton iteration!                                        *
      ****************************************************************************/
     debugString(LOG_NLS_HOMOTOPY, "Newton iteration for corrector step begins!");
+
+    /* If this is the last step, use backtrace strategy with one fixed coordinate and fix lambda */
+    if (solverData->yt[solverData->n] == 1)
+    {
+      debugString(LOG_NLS_HOMOTOPY, "Force '-homBacktraceStrategy=fix' and fix lambda, because this is the last step!");
+      debugDouble(LOG_NLS_HOMOTOPY, "Set tolerance homHEps to newtonFTol =", newtonFTol);
+      correctorStrategy = 1;
+      pos = solverData->n;
+      hEps = newtonFTol;
+    }
+
     if (correctorStrategy==1)
       debugString(LOG_NLS_HOMOTOPY, "Using backtrace strategy with one fixed coordinate! To change this use: '-homBacktraceStrategy=orthogonal'");
     else
       debugString(LOG_NLS_HOMOTOPY, "Using backtrace strategy orthogonal to the tangent vector! To change this use: '-homBacktraceStrategy=fix'");
+
 
     for(j=0;j<maxiter;j++)
     {
@@ -1920,14 +1920,6 @@ static int homotopyAlgorithm(DATA_HOMOTOPY* solverData, double *x)
       }
       matVecMultAbs(solverData->n, solverData->m, solverData->hJac, solverData->ones, solverData->resScaling);
       debugVectorDouble(LOG_NLS_HOMOTOPY, "residuum scaling of function h:", solverData->resScaling, solverData->n);
-
-      /* If this is the last step, use backtrace strategy with one fixed coordinate and fix lambda */
-      if (solverData->yt[solverData->n] == 1)
-      {
-        debugString(LOG_NLS_HOMOTOPY, "Fix lambda, because this is the last step!");
-        correctorStrategy = 1;
-        pos = solverData->n;
-      }
 
       if (correctorStrategy==1) // fix one coordinate
       {
@@ -2105,20 +2097,13 @@ int solveHomotopy(DATA *data, threadData_t *threadData, int sysNumber)
 
   int i, j;
   int success = 0;
-  int nfunc_evals = 0;
-  int continuous = 1;
-  double local_tol = solverData->ftol_sqrd;
-  double lambda;
   double error_f_sqrd, error_f1_sqrd;
 
   int assert = 1;
   int giveUp = 0;
   int alreadyTested = 0;
-  int iflag = 1;
   int pos;
   int rank;
-  int iter;
-  int maxiter = 10;
   int tries = 0;
   /* Modelica homotopy operator could be used!! */
   int runHomotopy = 0;
@@ -2288,7 +2273,6 @@ int solveHomotopy(DATA *data, threadData_t *threadData, int sysNumber)
   {
     giveUp = 1;
 
-    /*if (!skipNewton) newtonAlgorithm(solverData, solverData->x); */
     if (!skipNewton && !solverData->initHomotopy){
 
       /* set x vector */
@@ -2411,7 +2395,6 @@ int solveHomotopy(DATA *data, threadData_t *threadData, int sysNumber)
       if (runHomotopy == 1)
       {
         /* store x0 and calculate f(x0) -> newton homotopy, fJac(x0) -> taylor, affin homotopy */
-        solverData->homotopyMethod = 1;
         solverData->h_function = wrapper_fvec_homotopy_newton;
         solverData->hJac_dh = wrapper_fvec_homotopy_newton_der;
         solverData->startDirection = 1.0;
@@ -2420,7 +2403,6 @@ int solveHomotopy(DATA *data, threadData_t *threadData, int sysNumber)
       if (runHomotopy == 2)
       {
         /* store x0 and calculate f(x0) -> newton homotopy, fJac(x0) -> taylor, affin homotopy */
-        solverData->homotopyMethod = 1;
         solverData->h_function = wrapper_fvec_homotopy_newton;
         solverData->hJac_dh = wrapper_fvec_homotopy_newton_der;
         solverData->startDirection = -1.0;
@@ -2428,7 +2410,6 @@ int solveHomotopy(DATA *data, threadData_t *threadData, int sysNumber)
       }
       if (runHomotopy == 3)
       {
-        solverData->homotopyMethod = 2;
         solverData->h_function = wrapper_fvec_homotopy_fixpoint;
         solverData->hJac_dh = wrapper_fvec_homotopy_fixpoint_der;
         solverData->startDirection = 1.0;
