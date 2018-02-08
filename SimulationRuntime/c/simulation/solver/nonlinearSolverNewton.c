@@ -200,7 +200,6 @@ int solveNewton(DATA *data, threadData_t *threadData, int sysNumber)
   int retries2 = 0;
   int nonContinuousCase = 0;
   modelica_boolean *relationsPreBackup = NULL;
-  // int casualTearingSet = systemData->strictTearingFunctionCall != NULL;
   int casualTearingSet = data->simulationInfo->nonlinearSystemData[sysNumber].strictTearingFunctionCall != NULL;
 
   DATA_USER* userdata = (DATA_USER*)malloc(sizeof(DATA_USER));
