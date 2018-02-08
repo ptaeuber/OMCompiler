@@ -184,16 +184,6 @@ int _omc_newton(int(*f)(int*, double*, double*, void*, int), DATA_NEWTON* solver
   double error_f  = 1.0 + *eps, scaledError_f = 1.0 + *eps, delta_x = 1.0 + *eps, delta_f = 1.0 + *eps, delta_x_scaled = 1.0 + *eps, lambda = 1.0;
   double current_fvec_enorm, enorm_new;
 
-  // Initialize lambda variable
-  if (data->simulationInfo->nonlinearSystemData[uData->sysNumber].homotopySupport) {
-    solverData->x[*n] = 1.0;
-    solverData->x_new[*n] = 1.0;
-  }
-  else {
-    solverData->x[*n] = 0.0;
-    solverData->x_new[*n] = 0.0;
-  }
-
   if(ACTIVE_STREAM(LOG_NLS_V))
   {
     infoStreamPrint(LOG_NLS_V, 1, "######### Start Newton maxfev: %d #########", (int)*maxfev);

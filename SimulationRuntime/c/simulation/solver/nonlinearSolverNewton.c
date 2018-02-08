@@ -224,6 +224,16 @@ int solveNewton(DATA *data, threadData_t *threadData, int sysNumber)
   /* try to calculate jacobian only once at the beginning of the iteration */
   solverData->calculate_jacobian = 0;
 
+  // Initialize lambda variable
+  if (data->simulationInfo->nonlinearSystemData[sysNumber].homotopySupport) {
+    solverData->x[solverData->n] = 1.0;
+    solverData->x_new[solverData->n] = 1.0;
+  }
+  else {
+    solverData->x[solverData->n] = 0.0;
+    solverData->x_new[solverData->n] = 0.0;
+  }
+
   /* debug output */
   if(ACTIVE_STREAM(LOG_NLS_V))
   {
